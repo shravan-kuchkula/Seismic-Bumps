@@ -32,18 +32,6 @@ source("libraries.R")
 #download.file(url, "seismic-bumps.arff")
 seismicData <- import("seismic-bumps.arff")
 glimpse(seismicData)
-
-summary_seismic <- seismicData %>%
-    summarise_all(funs("Total" = n(),
-                  "Nulls" = sum(is.na(.)),
-                  "Filled" = sum(!is.na(.)),
-                  "Cardinality" = length(unique(.)))) %>%
-    melt() %>%
-    separate(variable, into = c('variable', 'measure'), sep="_") %>%
-    spread(measure, value)  %>%
-    mutate(Complete = Filled/Total,
-           Uniqueness = Cardinality/Total,
-           Distinctness = Cardinality/Filled)
 ```
 
 ## Exploratory Data Analysis

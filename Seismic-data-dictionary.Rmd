@@ -1,0 +1,50 @@
+--- 
+date: "November 27, 2017"
+title: "Seismic-data-dictionary"
+author: "Dave, Shravan, Tommy"
+output:
+  github_document:
+    toc: yes
+  html_document:
+    keep_md: yes
+    theme: cosmo
+    toc: yes
+  pdf_document:
+    fig_caption: yes
+    highlight: zenburn
+---
+# Seismic Data
+
+A description of the Seismic data set can be found here:  https://archive.ics.uci.edu/ml/datasets/seismic-bumps
+
+
+### Variable Types and Cardinality
+
+One of the things we need to do to prepare for logistic regression using most ML libraries is to encode the categorical variables using dummy encoding or one-hot encoding.  In order to do that, and not deal with a prohibitively wide data set, we need to understand the cardinality of the variables and classify them accordingly.  
+
+```{r include=FALSE}
+source("libraries.R")
+seismicData <- import("seismic-bumps.arff")
+seismicSummary <- seismicData %>%
+    summarise_all(funs("Total" = n(),
+                  "Nulls" = sum(is.na(.)),
+                  "Filled" = sum(!is.na(.)),
+                  "Cardinality" = length(unique(.)))) %>%
+    melt() %>%
+    separate(variable, into = c('variable', 'measure'), sep="_") %>%
+    spread(measure, value)  %>%
+    mutate(Complete = Filled/Total,
+           Uniqueness = Cardinality/Total,
+           Distinctness = Cardinality/Filled)
+```
+```{r}
+seismicSummary
+```
+
+Based solely on the cardinality of values, it would appear that at least 5 variables (energy, gdenergy, gdpuls, genergy, and gpuls) are too continuous to dummy encode.  The rest of the varialbes are feasible (at least) for one-hot / dummy encoding.  The actual categorical variables are listed with their levels below, but #TODO: We will investigate treating numeric variables as categorical in about half of the remaining variables, so they can be used as predictor features for the 'class' outcome variable.
+
+```{r echo = FALSE}
+seismicLevels <- seismicData %>%
+    sapply(levels)
+glimpse(seismicLevels)
+```
