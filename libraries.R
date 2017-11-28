@@ -10,7 +10,7 @@ libs <- c("readr", "dplyr", "tidyr", "ggplot2",
           "magrittr", "markdown", "knitr", "yaml",
           "corrplot", "GGally", "broom", "psych",
           "car", "vtreat", "caret", "mlbench",
-          "caTools", "rio", "ranger", "pROC"
+          "caTools", "rio", "ranger", "pROC", "reshape"
           )
 
 installRequiredPackages(libs)
