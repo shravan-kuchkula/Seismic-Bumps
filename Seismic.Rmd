@@ -1,0 +1,154 @@
+---
+title: "seismic.Rmd"
+author: "Shravan Kuchkula"
+date: "11/23/2017"
+output:
+  github_document:
+    toc: yes
+  html_document:
+    keep_md: yes
+    theme: cosmo
+    toc: yes
+  pdf_document:
+    fig_caption: yes
+    highlight: zenburn
+---
+
+## Introduction
+
+Mining activity was and is always connected with the occurrence of dangers which are commonly called mining hazards. A special case of such threat is a seismic hazard which frequently occurs in many underground mines. Seismic hazard is the hardest detectable and predictable of natural hazards and in this respect it is comparable to an earthquake. More and more advanced seismic and seismoacoustic monitoring systems allow a better understanding rock mass processes and definition of seismic hazard prediction methods. Accuracy of so far created methods is however far from perfect. Complexity of seismic processes and big disproportion between the number of low-energy seismic events and the number of high-energy phenomena (e.g. > 10^4J) causes the statistical techniques to be insufficient to predict seismic hazard.
+
+The data describe the problem of high energy (higher than 10^4 J) seismic bumps forecasting in a coal mine. Data come from two of longwalls located in a Polish coal mine.
+
+## Getting the data
+
+```{r message=FALSE, warning=FALSE}
+source("libraries.R")
+```
+
+
+```{r message=FALSE, warning=FALSE}
+#url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00266/seismic-bumps.arff"
+#download.file(url, "seismic-bumps.arff")
+seismicData <- import("seismic-bumps.arff")
+glimpse(seismicData)
+```
+
+## Exploratory Data Analysis
+
+### How many observations are "hazardous state (class = 1)" and "non-hazardous state (class = 0)" ?
+
+```{r}
+table(seismicData$class)
+```
+
+## Logistic Regression Model
+
+Fit a logistic regression model with what you think could be contributing to the seismic hazard. 
+
+```{r}
+seismic_model <- glm(class ~ seismic + seismoacoustic + shift + ghazard,
+                     data = seismicData, family = "binomial")
+
+summary(seismic_model)
+```
+
+Making a binary prediction:
+We used the glm() function to build a logistic regression model of the `class` variable. As with many of R's machine learning methods, you can apply the `predict()` function to the model object to forecast future behavior. By default, predict() outputs predictions in terms of log odds unless `type = "response"` is specified. This converts the log odds to probabilities.
+
+Because a logistic regression model estimates the probability of the outcome, it is up to you to determine the threshold at which the probability implies action. One must balance the extremes of being too cautious versus being too aggressive. For example, if we classify an observation which has a probability of being in class 1 as 99% or greater, then we may miss out on some observations that may indeed be class 1 but were classified as class 0. This balance is particularly important to consider for severely imbalanced outcomes, such as in this dataset where class 1 are relatively rare.
+
+```{r}
+# make a copy
+seismicDataPredictions <- seismicData
+
+# Estimate the probability of class 1
+seismicDataPredictions$prob <- predict(seismic_model, type = "response")
+```
+
+Find the actual probability of an observation to be in class 1.
+```{r}
+mean(as.numeric(as.character(seismicData$class)))
+```
+
+We will use this as our cut-off threshold.
+
+```{r}
+seismicDataPredictions$pred <- ifelse(seismicDataPredictions$prob > 0.0657, 1, 0)
+```
+
+Now calculate the model accuracy:
+```{r}
+mean(seismicDataPredictions$pred == seismicDataPredictions$class)
+```
+
+This shows that the logistic regression model with all the factor variables made a correct prediction 44% of the time. 
+
+What would be the accuracy of the model if a model had simply predicted class 0 for each observation ?
+
+```{r}
+seismicDataPredictions$predNull <- 0
+mean(seismicDataPredictions$predNull == seismicDataPredictions$class)
+```
+
+With an accuracy of 44% the model is actually performing worse than if it were to predict class 0 for every record.
+
+This illustrates that "rare events" create challenges for classification models. When 1 outcome is very rare predicting the opposite can result in very high accuracy. 
+
+Calculate ROC Curves and AUC:
+The previous exercises have demonstrated that accuracy is a very misleading measure of model performance on imbalanced datasets. Graphing the model's performance better illustrates the tradeoff between a model that is overly agressive and one that is overly passive. Here we will create a ROC curve and compute the area under the curve (AUC) to evaluate the logistic regression model that we created above.
+
+```{r}
+ROC <- roc(seismicDataPredictions$class, seismicDataPredictions$prob)
+plot(ROC, col = "blue")
+text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
+```
+
+Dummy variables, missing data and interactions:
+
+```{r}
+seismic_model <- glm(class ~ . , data = seismicData, family = "binomial")
+summary(seismic_model)
+```
+
+Collect all the numeric variables and check for multi-collinearity:
+
+```{r}
+seismicDataNumeric <- seismicData %>%
+  select(genergy, gpuls, gdenergy, gdpuls, energy, maxenergy)
+```
+
+```{r}
+# Create the correlation matrix
+M <- round(cor(seismicDataNumeric), 2)
+
+# Create corrplot
+corrplot(M, method="pie", type = "lower")
+```
+
+
+
+
+
+
+
+Distribution of nbumps
+
+```{r message=FALSE}
+seismicData %>%
+  ggplot(aes(x = nbumps)) +
+  geom_histogram()
+```
+
+```{r message=FALSE}
+seismicData %>%
+  ggplot(aes(x = nbumps)) +
+  geom_histogram()
+```
+
+Questions:
+1. What is nbumps ?
+2. Why are nbumps6-9 all zeros ?
+
+
+
