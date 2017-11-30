@@ -82,3 +82,7 @@ Based solely on the cardinality of values, it would appear that at least 5 varia
     ##  $ energy        : NULL
     ##  $ maxenergy     : NULL
     ##  $ class         : chr [1:2] "0" "1"
+
+However, some of the numeric values only contain a handful of discrete values which can be viewed as coded categorical variables. In particular, maxenergy and the 'nbumps(n)' variables can be treated as categorical. So, in short, we see the following breakdown in variable types:
+
+The categorical variables are and the continuous variables are genergy, gdpuls, energy, maxenergy. The output variable is 'class'.

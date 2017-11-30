@@ -48,3 +48,19 @@ seismicLevels <- seismicData %>%
     sapply(levels)
 glimpse(seismicLevels)
 ```
+
+However, some of the numeric values only contain a handful of discrete values which can be viewed as coded categorical variables.  In particular, maxenergy and the 'nbumps(n)' variables can be treated as categorical.  So, in short, we see the following breakdown in variable types:
+
+```{r include=FALSE}
+categorical <- c("seismic", "seismoacoustic", "shift", "ghazard", "nbumps", "nbumps2", "nbumps3", "nbumps4", "nbumps5", "nbumps6", "nbumps7", "nbumps89", "class")
+continuous <- c("genergy", "gdpuls", "energy", "maxenergy")
+```
+
+The categorical variables are `r categorical` and the continuous variables are `r continuous`.  The output variable is 'class'.
+
+
+
+
+
+
+
