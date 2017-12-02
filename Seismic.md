@@ -7,7 +7,9 @@ Shravan Kuchkula
 -   [Getting the data](#getting-the-data)
 -   [Exploratory Data Analysis](#exploratory-data-analysis)
     -   [How many observations are "hazardous state (class = 1)" and "non-hazardous state (class = 0)" ?](#how-many-observations-are-hazardous-state-class-1-and-non-hazardous-state-class-0)
-    -   [Adding cardinality](#adding-cardinality)
+    -   [How are nbumps distributed ?](#how-are-nbumps-distributed)
+    -   [Check for multi-collinearity](#check-for-multi-collinearity)
+    -   [Variable Types and Cardinality](#variable-types-and-cardinality)
 -   [Logistic Regression Model](#logistic-regression-model)
 
 Introduction
@@ -66,7 +68,104 @@ table(seismicData$class)
     ##    0    1 
     ## 2414  170
 
-### Adding cardinality
+### How are nbumps distributed ?
+
+Distribution of all nbumps: Use `cowplot` to display all nbumps in a grid. ![](Seismic_files/figure-markdown_github/unnamed-chunk-4-1.png)
+
+### Check for multi-collinearity
+
+Collect all the numeric variables and check for multi-collinearity:
+
+``` r
+seismicDataNumeric <- seismicData %>%
+  select(genergy, gpuls, gdenergy, gdpuls, energy, maxenergy)
+```
+
+``` r
+# Create the correlation matrix
+M <- round(cor(seismicDataNumeric), 2)
+
+# Create corrplot
+corrplot(M, method="pie", type = "lower")
+```
+
+![](Seismic_files/figure-markdown_github/unnamed-chunk-6-1.png)
+
+### Variable Types and Cardinality
+
+One of the things we need to do to prepare for logistic regression using most ML libraries is to encode the categorical variables using dummy encoding or one-hot encoding. In order to do that, and not deal with a prohibitively wide data set, we need to understand the cardinality of the variables and classify them accordingly.
+
+``` r
+seismicSummary
+```
+
+    ##          variable Cardinality Filled Nulls Total Complete   Uniqueness
+    ## 1           class           2   2584     0  2584        1 0.0007739938
+    ## 2          energy         242   2584     0  2584        1 0.0936532508
+    ## 3        gdenergy         334   2584     0  2584        1 0.1292569659
+    ## 4          gdpuls         292   2584     0  2584        1 0.1130030960
+    ## 5         genergy        2212   2584     0  2584        1 0.8560371517
+    ## 6         ghazard           3   2584     0  2584        1 0.0011609907
+    ## 7           gpuls        1128   2584     0  2584        1 0.4365325077
+    ## 8       maxenergy          33   2584     0  2584        1 0.0127708978
+    ## 9          nbumps          10   2584     0  2584        1 0.0038699690
+    ## 10        nbumps2           7   2584     0  2584        1 0.0027089783
+    ## 11        nbumps3           7   2584     0  2584        1 0.0027089783
+    ## 12        nbumps4           4   2584     0  2584        1 0.0015479876
+    ## 13        nbumps5           2   2584     0  2584        1 0.0007739938
+    ## 14        nbumps6           1   2584     0  2584        1 0.0003869969
+    ## 15        nbumps7           1   2584     0  2584        1 0.0003869969
+    ## 16       nbumps89           1   2584     0  2584        1 0.0003869969
+    ## 17        seismic           2   2584     0  2584        1 0.0007739938
+    ## 18 seismoacoustic           3   2584     0  2584        1 0.0011609907
+    ## 19          shift           2   2584     0  2584        1 0.0007739938
+    ##    Distinctness
+    ## 1  0.0007739938
+    ## 2  0.0936532508
+    ## 3  0.1292569659
+    ## 4  0.1130030960
+    ## 5  0.8560371517
+    ## 6  0.0011609907
+    ## 7  0.4365325077
+    ## 8  0.0127708978
+    ## 9  0.0038699690
+    ## 10 0.0027089783
+    ## 11 0.0027089783
+    ## 12 0.0015479876
+    ## 13 0.0007739938
+    ## 14 0.0003869969
+    ## 15 0.0003869969
+    ## 16 0.0003869969
+    ## 17 0.0007739938
+    ## 18 0.0011609907
+    ## 19 0.0007739938
+
+Based solely on the cardinality of values, it would appear that at least 5 variables (energy, gdenergy, gdpuls, genergy, and gpuls) are too continuous to dummy encode. The rest of the varialbes are feasible (at least) for one-hot / dummy encoding. The actual categorical variables are listed with their levels below, but \#TODO: We will investigate treating numeric variables as categorical in about half of the remaining variables, so they can be used as predictor features for the 'class' outcome variable.
+
+    ## List of 19
+    ##  $ seismic       : chr [1:2] "a" "b"
+    ##  $ seismoacoustic: chr [1:3] "a" "b" "c"
+    ##  $ shift         : chr [1:2] "N" "W"
+    ##  $ genergy       : NULL
+    ##  $ gpuls         : NULL
+    ##  $ gdenergy      : NULL
+    ##  $ gdpuls        : NULL
+    ##  $ ghazard       : chr [1:3] "a" "b" "c"
+    ##  $ nbumps        : NULL
+    ##  $ nbumps2       : NULL
+    ##  $ nbumps3       : NULL
+    ##  $ nbumps4       : NULL
+    ##  $ nbumps5       : NULL
+    ##  $ nbumps6       : NULL
+    ##  $ nbumps7       : NULL
+    ##  $ nbumps89      : NULL
+    ##  $ energy        : NULL
+    ##  $ maxenergy     : NULL
+    ##  $ class         : chr [1:2] "0" "1"
+
+However, some of the numeric values only contain a handful of discrete values which can be viewed as coded categorical variables. In particular, maxenergy and the 'nbumps(n)' variables can be treated as categorical. So, in short, we see the following breakdown in variable types:
+
+The categorical variables are seismic, seismoacoustic, shift, ghazard, nbumps, nbumps2, nbumps3, nbumps4, nbumps5, nbumps6, nbumps7, nbumps89, class and the continuous variables are genergy, gdpuls, energy, maxenergy. The output variable is 'class'.
 
 Logistic Regression Model
 -------------------------
@@ -166,7 +265,7 @@ plot(ROC, col = "blue")
 text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
 ```
 
-![](Seismic_files/figure-markdown_github/unnamed-chunk-11-1.png)
+![](Seismic_files/figure-markdown_github/unnamed-chunk-17-1.png)
 
 Dummy variables, missing data and interactions:
 
@@ -216,97 +315,3 @@ summary(seismic_model)
     ## AIC: 1109.2
     ## 
     ## Number of Fisher Scoring iterations: 15
-
-Collect all the numeric variables and check for multi-collinearity:
-
-``` r
-seismicDataNumeric <- seismicData %>%
-  select(genergy, gpuls, gdenergy, gdpuls, energy, maxenergy)
-```
-
-``` r
-# Create the correlation matrix
-M <- round(cor(seismicDataNumeric), 2)
-
-# Create corrplot
-corrplot(M, method="pie", type = "lower")
-```
-
-![](Seismic_files/figure-markdown_github/unnamed-chunk-14-1.png)
-
-Distribution of all nbumps: Use `cowplot` to display all nbumps in a grid.
-
-``` r
-library(cowplot)
-
-p1 <- seismicData %>%
-  ggplot(aes(x = nbumps)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p2 <- seismicData %>%
-  ggplot(aes(x = nbumps2)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p3 <- seismicData %>%
-  ggplot(aes(x = nbumps3)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p4 <- seismicData %>%
-  ggplot(aes(x = nbumps4)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p5 <- seismicData %>%
-  ggplot(aes(x = nbumps5)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p6 <- seismicData %>%
-  ggplot(aes(x = nbumps6)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p7 <- seismicData %>%
-  ggplot(aes(x = nbumps7)) +
-  geom_histogram() + 
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p89 <- seismicData %>%
-  ggplot(aes(x = nbumps89)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-plot_grid(p1, p2, p3, p4, p5, p6, p7, p89, ncol = 2)
-```
-
-    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-
-![](Seismic_files/figure-markdown_github/unnamed-chunk-15-1.png)
-
-Questions: 1. What is nbumps ? 2. Why are nbumps6-9 all zeros ?

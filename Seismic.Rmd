@@ -42,12 +42,129 @@ glimpse(seismicData)
 table(seismicData$class)
 ```
 
-### Adding cardinality
-```{r}
+### How are nbumps distributed ?
+
+Distribution of all nbumps: Use `cowplot` to display all nbumps in a grid.
+```{r echo=FALSE, message=FALSE}
+library(cowplot)
+
+p1 <- seismicData %>%
+  ggplot(aes(x = nbumps)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p2 <- seismicData %>%
+  ggplot(aes(x = nbumps2)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p3 <- seismicData %>%
+  ggplot(aes(x = nbumps3)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p4 <- seismicData %>%
+  ggplot(aes(x = nbumps4)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p5 <- seismicData %>%
+  ggplot(aes(x = nbumps5)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p6 <- seismicData %>%
+  ggplot(aes(x = nbumps6)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p7 <- seismicData %>%
+  ggplot(aes(x = nbumps7)) +
+  geom_histogram() + 
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p89 <- seismicData %>%
+  ggplot(aes(x = nbumps89)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+plot_grid(p1, p2, p3, p4, p5, p6, p7, p89, ncol = 2)
 
 ```
 
 
+### Check for multi-collinearity
+
+Collect all the numeric variables and check for multi-collinearity:
+
+```{r}
+seismicDataNumeric <- seismicData %>%
+  select(genergy, gpuls, gdenergy, gdpuls, energy, maxenergy)
+```
+
+```{r}
+# Create the correlation matrix
+M <- round(cor(seismicDataNumeric), 2)
+
+# Create corrplot
+corrplot(M, method="pie", type = "lower")
+```
+
+### Variable Types and Cardinality
+
+One of the things we need to do to prepare for logistic regression using most ML libraries is to encode the categorical variables using dummy encoding or one-hot encoding.  In order to do that, and not deal with a prohibitively wide data set, we need to understand the cardinality of the variables and classify them accordingly.  
+
+```{r include=FALSE}
+source("libraries.R")
+seismicData <- import("seismic-bumps.arff")
+seismicSummary <- seismicData %>%
+    summarise_all(funs("Total" = n(),
+                  "Nulls" = sum(is.na(.)),
+                  "Filled" = sum(!is.na(.)),
+                  "Cardinality" = length(unique(.)))) %>%
+    melt() %>%
+    separate(variable, into = c('variable', 'measure'), sep="_") %>%
+    spread(measure, value)  %>%
+    mutate(Complete = Filled/Total,
+           Uniqueness = Cardinality/Total,
+           Distinctness = Cardinality/Filled)
+```
+```{r}
+seismicSummary
+```
+
+Based solely on the cardinality of values, it would appear that at least 5 variables (energy, gdenergy, gdpuls, genergy, and gpuls) are too continuous to dummy encode.  The rest of the varialbes are feasible (at least) for one-hot / dummy encoding.  The actual categorical variables are listed with their levels below, but #TODO: We will investigate treating numeric variables as categorical in about half of the remaining variables, so they can be used as predictor features for the 'class' outcome variable.
+
+```{r echo = FALSE}
+seismicLevels <- seismicData %>%
+    sapply(levels)
+glimpse(seismicLevels)
+```
+
+However, some of the numeric values only contain a handful of discrete values which can be viewed as coded categorical variables.  In particular, maxenergy and the 'nbumps(n)' variables can be treated as categorical.  So, in short, we see the following breakdown in variable types:
+
+```{r include=FALSE}
+categorical <- c("seismic", "seismoacoustic", "shift", "ghazard", "nbumps", "nbumps2", "nbumps3", "nbumps4", "nbumps5", "nbumps6", "nbumps7", "nbumps89", "class")
+continuous <- c("genergy", "gdpuls", "energy", "maxenergy")
+```
+
+The categorical variables are `r categorical` and the continuous variables are `r continuous`.  The output variable is 'class'.
 
 ## Logistic Regression Model
 
@@ -117,92 +234,4 @@ Dummy variables, missing data and interactions:
 seismic_model <- glm(class ~ . , data = seismicData, family = "binomial")
 summary(seismic_model)
 ```
-
-Collect all the numeric variables and check for multi-collinearity:
-
-```{r}
-seismicDataNumeric <- seismicData %>%
-  select(genergy, gpuls, gdenergy, gdpuls, energy, maxenergy)
-```
-
-```{r}
-# Create the correlation matrix
-M <- round(cor(seismicDataNumeric), 2)
-
-# Create corrplot
-corrplot(M, method="pie", type = "lower")
-```
-
-Distribution of all nbumps: Use `cowplot` to display all nbumps in a grid.
-```{r}
-library(cowplot)
-
-p1 <- seismicData %>%
-  ggplot(aes(x = nbumps)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p2 <- seismicData %>%
-  ggplot(aes(x = nbumps2)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p3 <- seismicData %>%
-  ggplot(aes(x = nbumps3)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p4 <- seismicData %>%
-  ggplot(aes(x = nbumps4)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p5 <- seismicData %>%
-  ggplot(aes(x = nbumps5)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p6 <- seismicData %>%
-  ggplot(aes(x = nbumps6)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p7 <- seismicData %>%
-  ggplot(aes(x = nbumps7)) +
-  geom_histogram() + 
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-p89 <- seismicData %>%
-  ggplot(aes(x = nbumps89)) +
-  geom_histogram() +
-  theme(axis.text.y = element_text(size = 5), axis.text.x = element_text(size = 5),
-        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
-        axis.ticks = element_blank())
-
-plot_grid(p1, p2, p3, p4, p5, p6, p7, p89, ncol = 2)
-
-```
-
-
-
-
-Questions:
-1. What is nbumps ?
-2. Why are nbumps6-9 all zeros ?
-
-
 
