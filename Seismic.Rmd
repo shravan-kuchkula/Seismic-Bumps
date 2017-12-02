@@ -257,10 +257,15 @@ seismic_model <- glm(class ~ . , data = seismicData, family = "binomial")
 summary(seismic_model)
 ```
 
+## Evaluating the model performance. 
+
+## Comparing the performance of classification techniques. 
+
 ## References
 
   * [Application of rule induction algorithms for analysis of data collected by seismic  hazard monitoring systems in coal mines.](https://actamont.tuke.sk/pdf/2013/n4/7sikora.pdf)
   * [A Study of Rockburst Hazard Evaluation Method in Coal Mine](https://www.hindawi.com/journals/sv/2016/8740868/#B13)
+  * [Classification: Basic concepts, decision trees and model evaluation](https://www-users.cs.umn.edu/~kumar001/dmbook/ch4.pdf)
 
 
 
