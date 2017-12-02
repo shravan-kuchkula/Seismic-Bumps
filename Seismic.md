@@ -5,12 +5,14 @@ Shravan Kuchkula
 
 -   [Introduction](#introduction)
 -   [Getting the data](#getting-the-data)
+-   [Data set description](#data-set-description)
 -   [Exploratory Data Analysis](#exploratory-data-analysis)
     -   [How many observations are "hazardous state (class = 1)" and "non-hazardous state (class = 0)" ?](#how-many-observations-are-hazardous-state-class-1-and-non-hazardous-state-class-0)
     -   [How are nbumps distributed ?](#how-are-nbumps-distributed)
     -   [Check for multi-collinearity](#check-for-multi-collinearity)
     -   [Variable Types and Cardinality](#variable-types-and-cardinality)
 -   [Logistic Regression Model](#logistic-regression-model)
+-   [References](#references)
 
 Introduction
 ------------
@@ -54,6 +56,29 @@ glimpse(seismicData)
     ## $ energy         <dbl> 0, 2000, 0, 3000, 0, 0, 1000, 4000, 0, 500, 500...
     ## $ maxenergy      <dbl> 0, 2000, 0, 3000, 0, 0, 700, 4000, 0, 500, 5000...
     ## $ class          <fctr> 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0...
+
+Data set description
+--------------------
+
+-   **seismic**: result of shift seismic hazard assessment in the mine working obtained by the seismic method (a - lack of hazard, b - low hazard, c - high hazard, d - danger state);
+-   **seismoacoustic**: result of shift seismic hazard assessment in the mine working obtained by the seismoacoustic method;
+-   **shift**: information about type of a shift (W - coal-getting, N -preparation shift);
+-   **genergy**: seismic energy recorded within previous shift by the most active geophone (GMax) out of geophones monitoring the longwall;
+-   **gpuls**: a number of pulses recorded within previous shift by GMax;
+-   **gdenergy**: a deviation of energy recorded within previous shift by GMax from average energy recorded during eight previous shifts;
+-   **gdpuls**: a deviation of a number of pulses recorded within previous shift by GMax from average number of pulses recorded during eight previous shifts;
+-   **ghazard**: result of shift seismic hazard assessment in the mine working obtained by the seismoacoustic method based on registration coming form GMax only;
+-   **nbumps**: the number of seismic bumps recorded within previous shift;
+-   **nbumps2**: the number of seismic bumps (in energy range \[10<sup>2,10</sup>3)) registered within previous shift;
+-   **nbumps3**: the number of seismic bumps (in energy range \[10<sup>3,10</sup>4)) registered within previous shift;
+-   **nbumps4**: the number of seismic bumps (in energy range \[10<sup>4,10</sup>5)) registered within previous shift;
+-   **nbumps5**: the number of seismic bumps (in energy range \[10<sup>5,10</sup>6)) registered within the last shift;
+-   **nbumps6**: the number of seismic bumps (in energy range \[10<sup>6,10</sup>7)) registered within previous shift;
+-   **nbumps7**: the number of seismic bumps (in energy range \[10<sup>7,10</sup>8)) registered within previous shift;
+-   **nbumps89**: the number of seismic bumps (in energy range \[10<sup>8,10</sup>10)) registered within previous shift;
+-   **energy**: total energy of seismic bumps registered within previous shift;
+-   **maxenergy**: the maximum energy of the seismic bumps registered within previous shift;
+-   **class**: the decision attribute - '1' means that high energy seismic bump occurred in the next shift ('hazardous state'), '0' means that no high energy seismic bumps occurred in the next shift ('non-hazardous state').
 
 Exploratory Data Analysis
 -------------------------
@@ -315,3 +340,9 @@ summary(seismic_model)
     ## AIC: 1109.2
     ## 
     ## Number of Fisher Scoring iterations: 15
+
+References
+----------
+
+-   [Application of rule induction algorithms for analysis of data collected by seismic hazard monitoring systems in coal mines.](https://actamont.tuke.sk/pdf/2013/n4/7sikora.pdf)
+-   [A Study of Rockburst Hazard Evaluation Method in Coal Mine](https://www.hindawi.com/journals/sv/2016/8740868/#B13)
