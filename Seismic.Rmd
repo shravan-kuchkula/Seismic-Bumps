@@ -16,9 +16,9 @@ output:
 
 ## Introduction
 
-The dangers associated with coal mining are myriad -- black lung, flammable gas pockets, rockbursts, and tunnel collapses are all very real dangers that mining companies must consider when attempting to provide safe working conditions for miners.  One class of mining hazard, commonly called 'seismic hazards' are notoriously difficult to protect against, and even more difficult to predict with certainty.  It is, therefore, a well-known problem for machine learning and predictive analytics.  The UCI Machine Learning Repository provides a 'seismic bumps' data set that contains many records of combined categorical and numeric variables that characterize the state of a mine in the Zabrze-Bielszowice coal mine in Poland. 
+The dangers associated with coal mining are myriad; black lung, flammable gas pockets, rockbursts, and tunnel collapses are all very real dangers that mining companies must consider when attempting to provide safe working conditions for miners.  One class of mining hazard, commonly called 'seismic hazards', are notoriously difficult to protect against and even more difficult to predict with certainty.  Therefore, predicting these hazards has become a well-known problem for machine learning and predictive analytics.  The UCI Machine Learning Repository (https://archive.ics.uci.edu) provides a 'seismic bumps' data set that contains many records of combined categorical and numeric variables that could be used to predict seismic hazards.  This 'seismic bumps' data set can be found at https://archive.ics.uci.edu/ml/datasets/seismic-bumps. 
 
-Our analysis attempts to use logistic regression techniques to predict whether a seismic 'bump' is predictive of a notable seismic hazard, and then compares the results against the state of the art results from other statistical and machine learning techniques.
+Our analysis attempts to use logistic regression techniques to predict whether a seismic 'bump' is predictive of a notable seismic hazard.  We attempt to characterize our prediction accuracy and compare the results against the state of the art results from other statistical and machine learning techniques, that are included within the data set.
 
 ## Getting the data
 ```{r message=FALSE, warning=FALSE}
@@ -30,12 +30,13 @@ seismicData <- import("seismic-bumps.arff")
 
 ## Data set description
 
-The data were taken from from instruments in the Zabrze-Bielszowice coal mine, in Poland.  There are 2,584 records, with only 170 class = 1 variables, so the data are significantly skewed.  Field descriptions are below, but essentially energy readings and bump counts during one shift (8 hours) are used to predict a 'hazardous' (>10,000J) bump during the next shift.  A class = 1 signifies that a harzardous bump did, indeed, occur in the following shift.  For the sake of reference, a practical example of 10,000 Joules would be the the approximate energy required to lift 10,000 tomatoes 1m above the ground.  Here is an example of the fields in the data set.  
+The data were taken from from instruments in the Zabrze-Bielszowice coal mine, in Poland.  There are 2,584 records, with only 170 class = 1 variables, so the data are significantly skewed towards non-hazardous training data.  Field descriptions are below, but essentially energy readings and bump counts during one work shift are used to predict a 'hazardous' bump during the next shift.  From the data description, a 'hazardous bump' is a seismic event with > 10,000 Joules, and a 'shift' is a period of 8 hours. For the sake of reference, a practical example of 10,000 Joules would be the the approximate energy required to lift 10,000 tomatoes 1m above the ground.   A class = 1 variable result signifies that a harzardous bump did, indeed, occur in the following shift to the measured data.  Here is an example of the fields in the data set.  
 
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, echo = FALSE, warning=FALSE}
 glimpse(seismicData)
 ```
 
+From the UCI Machine Learning Repository, these are the field descriptions:
 
   * **seismic**: result of shift seismic hazard assessment in the mine working obtained by the seismic method (a - lack of hazard, b - low hazard, c - high hazard, d - danger state); 
   * **seismoacoustic**: result of shift seismic hazard assessment in the mine working obtained by the seismoacoustic method; 
@@ -59,7 +60,7 @@ glimpse(seismicData)
 
 ### Variable Types and Cardinality
 
-The data are mostly numeric with 5 categorical variables (one of which is the outcome variable, class).  However, since the 'nbumps' variables only have a small number of discrete values, they can also be treated as categorical ordinal variables, leaving 12 categorical input variables, 6 numeric variables and one categorical (binary) output variable.  
+There are 18 input variables and one binary output variable ("class").  The data are mostly numeric with 4 categorical input variables ("Seismic", "SeismoAcoustic", "Shift", and "Ghazard").  However, since the 'nbumps' variables only have a small number of discrete values, they can also be treated as categorical ordinal variables, leaving 12 categorical input variables, 6 numeric variables and one categorical (binary) output variable.  
 
 ```{r include=FALSE}
 source("libraries.R")
@@ -76,21 +77,18 @@ seismicSummary <- seismicData %>%
            Uniqueness = Cardinality/Total,
            Distinctness = Cardinality/Filled)
 ```
-```{r}
-seismicSummary
+
+A table outlining the variables and some of their attributes is below:
+
+```{r echo=FALSE, comment = NA}
+print(seismicSummary[,c(1,2,4,5,7,8)], row.names=FALSE)
 ```
 
-Based solely on the cardinality of values, it would appear that at least 5 variables (energy, gdenergy, gdpuls, genergy, and gpuls) are too continuous to dummy encode.  The rest of the varialbes are feasible (at least) for one-hot / dummy encoding.  The actual categorical variables are listed with their levels below, and we also include all of the 'nbumps' variables as categorical, since they occupie a small number of distinct levels.
 
-```{r echo = FALSE}
-seismicLevels <- seismicData %>%
-    sapply(levels)
-glimpse(seismicLevels)
-```
 
 ## Exploratory Data Analysis
 
-### How many observations are "hazardous state (class = 1)" and "non-hazardous state (class = 0)" ?
+It is important to understand how many observations are "hazardous state (class = 1)" and "non-hazardous state (class = 0)"
 
 ```{r}
 table(seismicData$class)
