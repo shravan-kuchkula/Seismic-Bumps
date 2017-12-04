@@ -1,7 +1,7 @@
 ---
 title: "seismic.Rmd"
-author: "Shravan Kuchkula"
-date: "11/23/2017"
+author: "Shravan Kuchkula, Dave Dyer, Tommy Pompo"
+date: "12/03/2017"
 output:
   github_document:
     toc: yes
@@ -16,25 +16,26 @@ output:
 
 ## Introduction
 
-Mining activity was and is always connected with the occurrence of dangers which are commonly called mining hazards. A special case of such threat is a seismic hazard which frequently occurs in many underground mines. Seismic hazard is the hardest detectable and predictable of natural hazards and in this respect it is comparable to an earthquake. More and more advanced seismic and seismoacoustic monitoring systems allow a better understanding rock mass processes and definition of seismic hazard prediction methods. Accuracy of so far created methods is however far from perfect. Complexity of seismic processes and big disproportion between the number of low-energy seismic events and the number of high-energy phenomena (e.g. > 10^4J) causes the statistical techniques to be insufficient to predict seismic hazard.
+The dangers associated with coal mining are myriad -- black lung, flammable gas pockets, rockbursts, and tunnel collapses are all very real dangers that mining companies must consider when attempting to provide safe working conditions for miners.  One class of mining hazard, commonly called 'seismic hazards' are notoriously difficult to protect against, and even more difficult to predict with certainty.  It is, therefore, a well-known problem for machine learning and predictive analytics.  The UCI Machine Learning Repository provides a 'seismic bumps' data set that contains many records of combined categorical and numeric variables that characterize the state of a mine in the Zabrze-Bielszowice coal mine in Poland. 
 
-The data describe the problem of high energy (higher than 10^4 J) seismic bumps forecasting in a coal mine. Data come from two of longwalls located in a Polish coal mine.
+Our analysis attempts to use logistic regression techniques to predict whether a seismic 'bump' is predictive of a notable seismic hazard, and then compares the results against the state of the art results from other statistical and machine learning techniques.
 
 ## Getting the data
-
 ```{r message=FALSE, warning=FALSE}
 source("libraries.R")
-```
-
-
-```{r message=FALSE, warning=FALSE}
 #url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00266/seismic-bumps.arff"
 #download.file(url, "seismic-bumps.arff")
 seismicData <- import("seismic-bumps.arff")
-glimpse(seismicData)
 ```
 
 ## Data set description
+
+The data were taken from from instruments in the Zabrze-Bielszowice coal mine, in Poland.  There are 2,584 records, with only 170 class = 1 variables, so the data are significantly skewed.  Field descriptions are below, but essentially energy readings and bump counts during one shift (8 hours) are used to predict a 'hazardous' (>10,000J) bump during the next shift.  A class = 1 signifies that a harzardous bump did, indeed, occur in the following shift.  For the sake of reference, a practical example of 10,000 Joules would be the the approximate energy required to lift 10,000 tomatoes 1m above the ground.  Here is an example of the fields in the data set.  
+
+```{r message=FALSE, warning=FALSE}
+glimpse(seismicData)
+```
+
 
   * **seismic**: result of shift seismic hazard assessment in the mine working obtained by the seismic method (a - lack of hazard, b - low hazard, c - high hazard, d - danger state); 
   * **seismoacoustic**: result of shift seismic hazard assessment in the mine working obtained by the seismoacoustic method; 
@@ -55,6 +56,37 @@ glimpse(seismicData)
   * **energy**: total energy of seismic bumps registered within previous shift; 
   * **maxenergy**: the maximum energy of the seismic bumps registered within previous shift; 
   * **class**: the decision attribute - '1' means that high energy seismic bump occurred in the next shift ('hazardous state'), '0' means that no high energy seismic bumps occurred in the next shift ('non-hazardous state').
+
+### Variable Types and Cardinality
+
+The data are mostly numeric with 5 categorical variables (one of which is the outcome variable, class).  However, since the 'nbumps' variables only have a small number of discrete values, they can also be treated as categorical ordinal variables, leaving 12 categorical input variables, 6 numeric variables and one categorical (binary) output variable.  
+
+```{r include=FALSE}
+source("libraries.R")
+seismicData <- import("seismic-bumps.arff")
+seismicSummary <- seismicData %>%
+    summarise_all(funs("Total" = n(),
+                  "Nulls" = sum(is.na(.)),
+                  "Filled" = sum(!is.na(.)),
+                  "Cardinality" = length(unique(.)))) %>%
+    melt() %>%
+    separate(variable, into = c('variable', 'measure'), sep="_") %>%
+    spread(measure, value)  %>%
+    mutate(Complete = Filled/Total,
+           Uniqueness = Cardinality/Total,
+           Distinctness = Cardinality/Filled)
+```
+```{r}
+seismicSummary
+```
+
+Based solely on the cardinality of values, it would appear that at least 5 variables (energy, gdenergy, gdpuls, genergy, and gpuls) are too continuous to dummy encode.  The rest of the varialbes are feasible (at least) for one-hot / dummy encoding.  The actual categorical variables are listed with their levels below, and we also include all of the 'nbumps' variables as categorical, since they occupie a small number of distinct levels.
+
+```{r echo = FALSE}
+seismicLevels <- seismicData %>%
+    sapply(levels)
+glimpse(seismicLevels)
+```
 
 ## Exploratory Data Analysis
 
@@ -148,36 +180,7 @@ M <- round(cor(seismicDataNumeric), 2)
 corrplot(M, method="pie", type = "lower")
 ```
 
-### Variable Types and Cardinality
 
-One of the things we need to do to prepare for logistic regression using most ML libraries is to encode the categorical variables using dummy encoding or one-hot encoding.  In order to do that, and not deal with a prohibitively wide data set, we need to understand the cardinality of the variables and classify them accordingly.  
-
-```{r include=FALSE}
-source("libraries.R")
-seismicData <- import("seismic-bumps.arff")
-seismicSummary <- seismicData %>%
-    summarise_all(funs("Total" = n(),
-                  "Nulls" = sum(is.na(.)),
-                  "Filled" = sum(!is.na(.)),
-                  "Cardinality" = length(unique(.)))) %>%
-    melt() %>%
-    separate(variable, into = c('variable', 'measure'), sep="_") %>%
-    spread(measure, value)  %>%
-    mutate(Complete = Filled/Total,
-           Uniqueness = Cardinality/Total,
-           Distinctness = Cardinality/Filled)
-```
-```{r}
-seismicSummary
-```
-
-Based solely on the cardinality of values, it would appear that at least 5 variables (energy, gdenergy, gdpuls, genergy, and gpuls) are too continuous to dummy encode.  The rest of the varialbes are feasible (at least) for one-hot / dummy encoding.  The actual categorical variables are listed with their levels below, but #TODO: We will investigate treating numeric variables as categorical in about half of the remaining variables, so they can be used as predictor features for the 'class' outcome variable.
-
-```{r echo = FALSE}
-seismicLevels <- seismicData %>%
-    sapply(levels)
-glimpse(seismicLevels)
-```
 
 However, some of the numeric values only contain a handful of discrete values which can be viewed as coded categorical variables.  In particular, maxenergy and the 'nbumps(n)' variables can be treated as categorical.  So, in short, we see the following breakdown in variable types:
 
