@@ -60,7 +60,14 @@ From the UCI Machine Learning Repository, these are the field descriptions:
 
 ### Variable Types and Cardinality
 
-There are 18 input variables and one binary output variable ("class").  The data are mostly numeric with 4 categorical input variables ("Seismic", "SeismoAcoustic", "Shift", and "Ghazard").  However, since the 'nbumps' variables only have a small number of discrete values, they can also be treated as categorical ordinal variables, leaving 12 categorical input variables, 6 numeric variables and one categorical (binary) output variable.  
+There are 18 input variables and one binary output variable ("class").  The data are mostly numeric with 4 categorical input variables.  However, some of the numeric values only contain a handful of discrete values which can be viewed as coded categorical variables.  In particular, maxenergy and the 'nbumps(n)' variables can be treated as categorical.  So, in short, we see the following breakdown in variable types:
+
+```{r include=FALSE}
+categorical <- c("seismic", "seismoacoustic", "shift", "ghazard", "nbumps", "nbumps2", "nbumps3", "nbumps4", "nbumps5", "nbumps6", "nbumps7", "nbumps89", "class")
+continuous <- c("genergy", "gdpuls", "energy", "maxenergy")
+```
+
+The categorical variables are `r categorical` and the continuous variables are `r continuous`.  The output variable is 'class'.
 
 ```{r include=FALSE}
 source("libraries.R")
@@ -93,6 +100,8 @@ It is important to understand how many observations are "hazardous state (class 
 ```{r}
 table(seismicData$class)
 ```
+
+As mentioned above, the data set output variable is highly skewed, and contains many more non-hazardous classes than it does hazardous classes.  
 
 ### How are nbumps distributed ?
 
@@ -179,15 +188,6 @@ corrplot(M, method="pie", type = "lower")
 ```
 
 
-
-However, some of the numeric values only contain a handful of discrete values which can be viewed as coded categorical variables.  In particular, maxenergy and the 'nbumps(n)' variables can be treated as categorical.  So, in short, we see the following breakdown in variable types:
-
-```{r include=FALSE}
-categorical <- c("seismic", "seismoacoustic", "shift", "ghazard", "nbumps", "nbumps2", "nbumps3", "nbumps4", "nbumps5", "nbumps6", "nbumps7", "nbumps89", "class")
-continuous <- c("genergy", "gdpuls", "energy", "maxenergy")
-```
-
-The categorical variables are `r categorical` and the continuous variables are `r continuous`.  The output variable is 'class'.
 
 ## Logistic Regression Model
 
