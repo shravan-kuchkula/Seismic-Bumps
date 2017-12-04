@@ -170,7 +170,13 @@ plot_grid(p1, p2, p3, p4, p5, p6, p7, p89, ncol = 2)
 ```
 
 
-### Check for multi-collinearity
+### Logistic Regression Assumptions
+
+#### Linearity
+
+#### Independence of Errors
+
+#### Multi-collinearity
 
 Collect all the numeric variables and check for multi-collinearity:
 
@@ -186,8 +192,6 @@ M <- round(cor(seismicDataNumeric), 2)
 # Create corrplot
 corrplot(M, method="pie", type = "lower")
 ```
-
-
 
 ## Logistic Regression Model
 
