@@ -12,6 +12,8 @@ output:
   pdf_document:
     fig_caption: yes
     highlight: zenburn
+editor_options: 
+  chunk_output_type: console
 ---
 
 ## Introduction
@@ -34,9 +36,9 @@ The data were taken from from instruments in the Zabrze-Bielszowice coal mine, i
 
 ```{r message=FALSE, echo = FALSE, warning=FALSE}
 glimpse(seismicData)
-hazardous <- seismicData %>%
-    filter(class == 0) 
-nbumps_count <- hazardous %>%
+nonhazardous <- seismicData %>%
+    filter(class == "0")
+nonhaz_nbumps_count <- nonhazardous %>%
     summarize(sum_nbumps = sum(nbumps),
               sum_nbumps2 = sum(nbumps2),
               sum_nbumps3 = sum(nbumps3),
@@ -46,13 +48,37 @@ nbumps_count <- hazardous %>%
               sum_nbumps7 = sum(nbumps7),
               sum_nbumps89 = sum(nbumps89),
               )
-bumps <- data.frame(col1 = c(1858, 849, 847, 150, 11, 0, 0, 0))
-row.names(bumps) <- names(nbumps_count)
-ggplot(bumps, aes(x=row.names(bumps), y=col1)) + 
+hazardous <- seismicData %>%
+    filter(class == "1") 
+haz_nbumps_count <- hazardous %>%
+    summarize(sum_nbumps = sum(nbumps),
+              sum_nbumps2 = sum(nbumps2),
+              sum_nbumps3 = sum(nbumps3),
+              sum_nbumps4 = sum(nbumps4),
+              sum_nbumps5 = sum(nbumps5),
+              sum_nbumps6 = sum(nbumps6),
+              sum_nbumps7 = sum(nbumps7),
+              sum_nbumps89 = sum(nbumps89),
+              )
+nonhaz_bumps <- data.frame(col1 = c(1858, 849, 847, 150, 11, 0, 0, 0))  # note, this is ugly and static.
+haz_bumps <- data.frame(col1 = c(363, 168, 168, 25, 1, 0, 0, 0))  # this too.
+row.names(bumps) <- names(haz_nbumps_count)
+phaz <- ggplot(haz_bumps, aes(x=row.names(bumps), y=col1)) + 
     geom_col(fill="goldenrod3", color="goldenrod4") +
     theme(axis.text.x = element_text(angle=45, hjust=1)) + 
     ylab("Count") + 
-    xlab("Bump Variables (Summed)")
+    xlab("Bump Variables (Summed)") + 
+    ggtitle("Hazardous Bumps Breakdown")
+
+
+pnonhaz <- ggplot(nonhaz_bumps, aes(x=row.names(bumps), y=col1)) + 
+    geom_col(fill="coral3", color="coral4") +
+    theme(axis.text.x = element_text(angle=45, hjust=1)) + 
+    ylab("Count") + 
+    xlab("Bump Variables (Summed)") + 
+    ggtitle("NonHazardous Bumps Breakdown")
+library(gridExtra)
+grid.arrange(phaz, pnonhaz, ncol=2)
 ```
 
 From the UCI Machine Learning Repository, these are the field descriptions:
