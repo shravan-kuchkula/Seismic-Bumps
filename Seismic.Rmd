@@ -46,7 +46,7 @@ nonhaz_nbumps_count <- nonhazardous %>%
               sum_nbumps5 = sum(nbumps5),
               sum_nbumps6 = sum(nbumps6),
               sum_nbumps7 = sum(nbumps7),
-              sum_nbumps89 = sum(nbumps89),
+              sum_nbumps89 = sum(nbumps89)
               )
 hazardous <- seismicData %>%
     filter(class == "1") 
@@ -58,12 +58,12 @@ haz_nbumps_count <- hazardous %>%
               sum_nbumps5 = sum(nbumps5),
               sum_nbumps6 = sum(nbumps6),
               sum_nbumps7 = sum(nbumps7),
-              sum_nbumps89 = sum(nbumps89),
+              sum_nbumps89 = sum(nbumps89)
               )
 nonhaz_bumps <- data.frame(col1 = c(1858, 849, 847, 150, 11, 0, 0, 0))  # note, this is ugly and static.
 haz_bumps <- data.frame(col1 = c(363, 168, 168, 25, 1, 0, 0, 0))  # this too.
-row.names(bumps) <- names(haz_nbumps_count)
-phaz <- ggplot(haz_bumps, aes(x=row.names(bumps), y=col1)) + 
+#row.names(bumps) <- names(haz_nbumps_count)
+phaz <- ggplot(haz_bumps, aes(x=row.names(haz_bumps), y=col1)) + 
     geom_col(fill="goldenrod3", color="goldenrod4") +
     theme(axis.text.x = element_text(angle=45, hjust=1)) + 
     ylab("Count") + 
@@ -71,7 +71,7 @@ phaz <- ggplot(haz_bumps, aes(x=row.names(bumps), y=col1)) +
     ggtitle("Hazardous Bumps Breakdown")
 
 
-pnonhaz <- ggplot(nonhaz_bumps, aes(x=row.names(bumps), y=col1)) + 
+pnonhaz <- ggplot(nonhaz_bumps, aes(x=row.names(nonhaz_bumps), y=col1)) + 
     geom_col(fill="coral3", color="coral4") +
     theme(axis.text.x = element_text(angle=45, hjust=1)) + 
     ylab("Count") + 

@@ -1,39 +1,41 @@
 seismic.Rmd
 ================
-Shravan Kuchkula
-11/23/2017
+Shravan Kuchkula, Dave Dyer, Tommy Pompo
+12/03/2017
 
 -   [Introduction](#introduction)
 -   [Getting the data](#getting-the-data)
 -   [Data set description](#data-set-description)
--   [Exploratory Data Analysis](#exploratory-data-analysis)
-    -   [How many observations are "hazardous state (class = 1)" and "non-hazardous state (class = 0)" ?](#how-many-observations-are-hazardous-state-class-1-and-non-hazardous-state-class-0)
-    -   [How are nbumps distributed ?](#how-are-nbumps-distributed)
-    -   [Check for multi-collinearity](#check-for-multi-collinearity)
     -   [Variable Types and Cardinality](#variable-types-and-cardinality)
+-   [Exploratory Data Analysis](#exploratory-data-analysis)
+    -   [How are nbumps distributed ?](#how-are-nbumps-distributed)
+    -   [Logistic Regression Assumptions](#logistic-regression-assumptions)
 -   [Logistic Regression Model](#logistic-regression-model)
+-   [Evaluating the model performance.](#evaluating-the-model-performance.)
+-   [Comparing the performance of classification techniques.](#comparing-the-performance-of-classification-techniques.)
 -   [References](#references)
 
 Introduction
 ------------
 
-Mining activity was and is always connected with the occurrence of dangers which are commonly called mining hazards. A special case of such threat is a seismic hazard which frequently occurs in many underground mines. Seismic hazard is the hardest detectable and predictable of natural hazards and in this respect it is comparable to an earthquake. More and more advanced seismic and seismoacoustic monitoring systems allow a better understanding rock mass processes and definition of seismic hazard prediction methods. Accuracy of so far created methods is however far from perfect. Complexity of seismic processes and big disproportion between the number of low-energy seismic events and the number of high-energy phenomena (e.g. &gt; 10^4J) causes the statistical techniques to be insufficient to predict seismic hazard.
+The dangers associated with coal mining are myriad; black lung, flammable gas pockets, rockbursts, and tunnel collapses are all very real dangers that mining companies must consider when attempting to provide safe working conditions for miners. One class of mining hazard, commonly called 'seismic hazards', are notoriously difficult to protect against and even more difficult to predict with certainty. Therefore, predicting these hazards has become a well-known problem for machine learning and predictive analytics. The UCI Machine Learning Repository (<https://archive.ics.uci.edu>) provides a 'seismic bumps' data set that contains many records of combined categorical and numeric variables that could be used to predict seismic hazards. This 'seismic bumps' data set can be found at <https://archive.ics.uci.edu/ml/datasets/seismic-bumps>.
 
-The data describe the problem of high energy (higher than 10^4 J) seismic bumps forecasting in a coal mine. Data come from two of longwalls located in a Polish coal mine.
+Our analysis attempts to use logistic regression techniques to predict whether a seismic 'bump' is predictive of a notable seismic hazard. We attempt to characterize our prediction accuracy and compare the results against the state of the art results from other statistical and machine learning techniques, that are included within the data set.
 
 Getting the data
 ----------------
 
 ``` r
 source("libraries.R")
-```
-
-``` r
 #url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00266/seismic-bumps.arff"
 #download.file(url, "seismic-bumps.arff")
 seismicData <- import("seismic-bumps.arff")
-glimpse(seismicData)
 ```
+
+Data set description
+--------------------
+
+The data were taken from from instruments in the Zabrze-Bielszowice coal mine, in Poland. There are 2,584 records, with only 170 class = 1 variables, so the data are significantly skewed towards non-hazardous training data. Field descriptions are below, but essentially energy readings and bump counts during one work shift are used to predict a 'hazardous' bump during the next shift. From the data description, a 'hazardous bump' is a seismic event with &gt; 10,000 Joules, and a 'shift' is a period of 8 hours. For the sake of reference, a practical example of 10,000 Joules would be the the approximate energy required to lift 10,000 tomatoes 1m above the ground. A class = 1 variable result signifies that a harzardous bump did, indeed, occur in the following shift to the measured data. Here is an example of the fields in the data set.
 
     ## Observations: 2,584
     ## Variables: 19
@@ -57,8 +59,9 @@ glimpse(seismicData)
     ## $ maxenergy      <dbl> 0, 2000, 0, 3000, 0, 0, 700, 4000, 0, 500, 5000...
     ## $ class          <fctr> 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0...
 
-Data set description
---------------------
+![](Seismic_files/figure-markdown_github/unnamed-chunk-2-1.png)
+
+From the UCI Machine Learning Repository, these are the field descriptions:
 
 -   **seismic**: result of shift seismic hazard assessment in the mine working obtained by the seismic method (a - lack of hazard, b - low hazard, c - high hazard, d - danger state);
 -   **seismoacoustic**: result of shift seismic hazard assessment in the mine working obtained by the seismoacoustic method;
@@ -80,10 +83,39 @@ Data set description
 -   **maxenergy**: the maximum energy of the seismic bumps registered within previous shift;
 -   **class**: the decision attribute - '1' means that high energy seismic bump occurred in the next shift ('hazardous state'), '0' means that no high energy seismic bumps occurred in the next shift ('non-hazardous state').
 
+### Variable Types and Cardinality
+
+There are 18 input variables and one binary output variable ("class"). The data are mostly numeric with 4 categorical input variables. However, some of the numeric values only contain a handful of discrete values which can be viewed as coded categorical variables. In particular, maxenergy and the 'nbumps(n)' variables can be treated as categorical. So, in short, we see the following breakdown in variable types:
+
+The categorical variables are seismic, seismoacoustic, shift, ghazard, nbumps, nbumps2, nbumps3, nbumps4, nbumps5, nbumps6, nbumps7, nbumps89, class and the continuous variables are genergy, gdpuls, energy, maxenergy. The output variable is 'class'.
+
+A table outlining the variables and some of their attributes is below:
+
+           variable Cardinality Nulls Total   Uniqueness Distinctness
+              class           2     0  2584 0.0007739938 0.0007739938
+             energy         242     0  2584 0.0936532508 0.0936532508
+           gdenergy         334     0  2584 0.1292569659 0.1292569659
+             gdpuls         292     0  2584 0.1130030960 0.1130030960
+            genergy        2212     0  2584 0.8560371517 0.8560371517
+            ghazard           3     0  2584 0.0011609907 0.0011609907
+              gpuls        1128     0  2584 0.4365325077 0.4365325077
+          maxenergy          33     0  2584 0.0127708978 0.0127708978
+             nbumps          10     0  2584 0.0038699690 0.0038699690
+            nbumps2           7     0  2584 0.0027089783 0.0027089783
+            nbumps3           7     0  2584 0.0027089783 0.0027089783
+            nbumps4           4     0  2584 0.0015479876 0.0015479876
+            nbumps5           2     0  2584 0.0007739938 0.0007739938
+            nbumps6           1     0  2584 0.0003869969 0.0003869969
+            nbumps7           1     0  2584 0.0003869969 0.0003869969
+           nbumps89           1     0  2584 0.0003869969 0.0003869969
+            seismic           2     0  2584 0.0007739938 0.0007739938
+     seismoacoustic           3     0  2584 0.0011609907 0.0011609907
+              shift           2     0  2584 0.0007739938 0.0007739938
+
 Exploratory Data Analysis
 -------------------------
 
-### How many observations are "hazardous state (class = 1)" and "non-hazardous state (class = 0)" ?
+It is important to understand how many observations are "hazardous state (class = 1)" and "non-hazardous state (class = 0)"
 
 ``` r
 table(seismicData$class)
@@ -93,11 +125,19 @@ table(seismicData$class)
     ##    0    1 
     ## 2414  170
 
+As mentioned above, the data set output variable is highly skewed, and contains many more non-hazardous classes than it does hazardous classes.
+
 ### How are nbumps distributed ?
 
-Distribution of all nbumps: Use `cowplot` to display all nbumps in a grid. ![](Seismic_files/figure-markdown_github/unnamed-chunk-4-1.png)
+Distribution of all nbumps: Use `cowplot` to display all nbumps in a grid. ![](Seismic_files/figure-markdown_github/unnamed-chunk-7-1.png)
 
-### Check for multi-collinearity
+### Logistic Regression Assumptions
+
+#### Linearity
+
+#### Independence of Errors
+
+#### Multi-collinearity
 
 Collect all the numeric variables and check for multi-collinearity:
 
@@ -114,83 +154,7 @@ M <- round(cor(seismicDataNumeric), 2)
 corrplot(M, method="pie", type = "lower")
 ```
 
-![](Seismic_files/figure-markdown_github/unnamed-chunk-6-1.png)
-
-### Variable Types and Cardinality
-
-One of the things we need to do to prepare for logistic regression using most ML libraries is to encode the categorical variables using dummy encoding or one-hot encoding. In order to do that, and not deal with a prohibitively wide data set, we need to understand the cardinality of the variables and classify them accordingly.
-
-``` r
-seismicSummary
-```
-
-    ##          variable Cardinality Filled Nulls Total Complete   Uniqueness
-    ## 1           class           2   2584     0  2584        1 0.0007739938
-    ## 2          energy         242   2584     0  2584        1 0.0936532508
-    ## 3        gdenergy         334   2584     0  2584        1 0.1292569659
-    ## 4          gdpuls         292   2584     0  2584        1 0.1130030960
-    ## 5         genergy        2212   2584     0  2584        1 0.8560371517
-    ## 6         ghazard           3   2584     0  2584        1 0.0011609907
-    ## 7           gpuls        1128   2584     0  2584        1 0.4365325077
-    ## 8       maxenergy          33   2584     0  2584        1 0.0127708978
-    ## 9          nbumps          10   2584     0  2584        1 0.0038699690
-    ## 10        nbumps2           7   2584     0  2584        1 0.0027089783
-    ## 11        nbumps3           7   2584     0  2584        1 0.0027089783
-    ## 12        nbumps4           4   2584     0  2584        1 0.0015479876
-    ## 13        nbumps5           2   2584     0  2584        1 0.0007739938
-    ## 14        nbumps6           1   2584     0  2584        1 0.0003869969
-    ## 15        nbumps7           1   2584     0  2584        1 0.0003869969
-    ## 16       nbumps89           1   2584     0  2584        1 0.0003869969
-    ## 17        seismic           2   2584     0  2584        1 0.0007739938
-    ## 18 seismoacoustic           3   2584     0  2584        1 0.0011609907
-    ## 19          shift           2   2584     0  2584        1 0.0007739938
-    ##    Distinctness
-    ## 1  0.0007739938
-    ## 2  0.0936532508
-    ## 3  0.1292569659
-    ## 4  0.1130030960
-    ## 5  0.8560371517
-    ## 6  0.0011609907
-    ## 7  0.4365325077
-    ## 8  0.0127708978
-    ## 9  0.0038699690
-    ## 10 0.0027089783
-    ## 11 0.0027089783
-    ## 12 0.0015479876
-    ## 13 0.0007739938
-    ## 14 0.0003869969
-    ## 15 0.0003869969
-    ## 16 0.0003869969
-    ## 17 0.0007739938
-    ## 18 0.0011609907
-    ## 19 0.0007739938
-
-Based solely on the cardinality of values, it would appear that at least 5 variables (energy, gdenergy, gdpuls, genergy, and gpuls) are too continuous to dummy encode. The rest of the varialbes are feasible (at least) for one-hot / dummy encoding. The actual categorical variables are listed with their levels below, but \#TODO: We will investigate treating numeric variables as categorical in about half of the remaining variables, so they can be used as predictor features for the 'class' outcome variable.
-
-    ## List of 19
-    ##  $ seismic       : chr [1:2] "a" "b"
-    ##  $ seismoacoustic: chr [1:3] "a" "b" "c"
-    ##  $ shift         : chr [1:2] "N" "W"
-    ##  $ genergy       : NULL
-    ##  $ gpuls         : NULL
-    ##  $ gdenergy      : NULL
-    ##  $ gdpuls        : NULL
-    ##  $ ghazard       : chr [1:3] "a" "b" "c"
-    ##  $ nbumps        : NULL
-    ##  $ nbumps2       : NULL
-    ##  $ nbumps3       : NULL
-    ##  $ nbumps4       : NULL
-    ##  $ nbumps5       : NULL
-    ##  $ nbumps6       : NULL
-    ##  $ nbumps7       : NULL
-    ##  $ nbumps89      : NULL
-    ##  $ energy        : NULL
-    ##  $ maxenergy     : NULL
-    ##  $ class         : chr [1:2] "0" "1"
-
-However, some of the numeric values only contain a handful of discrete values which can be viewed as coded categorical variables. In particular, maxenergy and the 'nbumps(n)' variables can be treated as categorical. So, in short, we see the following breakdown in variable types:
-
-The categorical variables are seismic, seismoacoustic, shift, ghazard, nbumps, nbumps2, nbumps3, nbumps4, nbumps5, nbumps6, nbumps7, nbumps89, class and the continuous variables are genergy, gdpuls, energy, maxenergy. The output variable is 'class'.
+![](Seismic_files/figure-markdown_github/unnamed-chunk-9-1.png)
 
 Logistic Regression Model
 -------------------------
@@ -290,7 +254,7 @@ plot(ROC, col = "blue")
 text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
 ```
 
-![](Seismic_files/figure-markdown_github/unnamed-chunk-17-1.png)
+![](Seismic_files/figure-markdown_github/unnamed-chunk-16-1.png)
 
 Dummy variables, missing data and interactions:
 
@@ -341,8 +305,38 @@ summary(seismic_model)
     ## 
     ## Number of Fisher Scoring iterations: 15
 
+Evaluating the model performance.
+---------------------------------
+
+Comparing the performance of classification techniques.
+-------------------------------------------------------
+
+Within the ARFF file is a large table of various classification techniques and their results.
+
+Classification results using stratified 10-fold cross-validation repeated 10 times
+
+| Algorithm                   | Acc.      | BAcc.     | Acc.0 spec | Acc.1 sense | Size  |
+|-----------------------------|-----------|-----------|------------|-------------|-------|
+| q-ModLEM(entropy-RSS) (1)   | 80.2(5.1) | 69.1(6.2) | 81.90      | 56.35       | 27.5  |
+| q-ModLEM(entropy-Corr.) (1) | 82.9(4.5) | 67.9(7.2) | 85.15      | 50.65       | 45.5  |
+| MODLEM (2)                  | 92.5(0.8) | 52.6(2.8) | 98.58      | 6.65        | 145.5 |
+| MLRules(-M 30) (3)          | 93.2(0.3) | 50.5(1.3) | 99.69      | 1.29        | 30    |
+| MLRules(-M 100) (3)         | 92.9(0.6) | 52.0(2.2) | 99.10      | 4.88        | 100   |
+| MLRules(-M 500) (3)         | 92.3(0.6) | 52.9(2.8) | 98.27      | 7.59        | 500   |
+| BRACID (4)                  | 87.5(0.4) | 62.0(2.6) | 91.38      | 32.71       | -     |
+| Jrip (Weka)                 | 93.0(0.6) | 51.4(2.4) | 99.35      | 3.47        | 1.8   |
+| PART (Weka)                 | 92.1(0.8) | 52.7(3.5) | 98.09      | 7.35        | 34    |
+| J48 (Weka)                  | 93.1(0.8) | 50.2(0.9) | 99.64      | 0.82        | 5.6   |
+| SimpleCart (Weka)           | 93.4(0.0) | 50.0(0.0) | 100        | 0.00        | 1.0   |
+| NaiveBayes (Weka)           | 86.7(2.0) | 64.7(5.8) | 90.08      | 39.41       | -     |
+| IB1 (Weka)                  | 89.4(1.6) | 55.3(4.8) | 94.54      | 16.06       | -     |
+| RandomForest(-I 100) (Weka) | 93.1(0.6) | 52.1(2.5) | 99.31      | 4.88        | 100   |
+
+------------------------------------------------------------------------
+
 References
 ----------
 
 -   [Application of rule induction algorithms for analysis of data collected by seismic hazard monitoring systems in coal mines.](https://actamont.tuke.sk/pdf/2013/n4/7sikora.pdf)
 -   [A Study of Rockburst Hazard Evaluation Method in Coal Mine](https://www.hindawi.com/journals/sv/2016/8740868/#B13)
+-   [Classification: Basic concepts, decision trees and model evaluation](https://www-users.cs.umn.edu/~kumar001/dmbook/ch4.pdf)
