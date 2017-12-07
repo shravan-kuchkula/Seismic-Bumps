@@ -153,8 +153,8 @@ corrplot(M, method="pie", type = "lower")
 One of the things we need to do to prepare for logistic regression using most ML libraries is to encode the categorical variables using dummy encoding or one-hot encoding.  In order to do that, and not deal with a prohibitively wide data set, we need to understand the cardinality of the variables and classify them accordingly.  
 
 ```{r include=FALSE}
-source("libraries.R")
-seismicData <- import("seismic-bumps.arff")
+#source("libraries.R")
+#seismicData <- import("seismic-bumps.arff")
 seismicSummary <- seismicData %>%
     summarise_all(funs("Total" = n(),
                   "Nulls" = sum(is.na(.)),
@@ -187,6 +187,70 @@ continuous <- c("genergy", "gdpuls", "energy", "maxenergy")
 ```
 
 The categorical variables are `r categorical` and the continuous variables are `r continuous`.  The output variable is 'class'.
+
+## Variable Screening
+
+Approach 1: Convert all nbumps to categorical variables.
+Approach 2: Treat nbumps as a continuous varaible. 
+
+We can assess how well our model building process works through Cross validation. The idea is that we can get an idea of how well the approach is going to perform on new data not yet collected. We will use AUC as the performance matrix.
+
+```{r}
+# Calculate N
+N <- nrow(seismicData)
+
+# Create a random number vector
+rvec <- runif(N)
+
+# Select rows from the dataframe
+seismicData.train <- seismicData[rvec < 0.75,]
+seismicData.test <- seismicData[rvec >= 0.75,]
+
+# Select rows for the class variable
+seismic_train_class <- seismicData.train$class
+seismic_test_class <- seismicData.test$class
+
+nrow(seismicData.train)
+nrow(seismicData.test)
+
+```
+
+Build the logistic regression model using all the predictors using the training dataset. Before using the glmnet function, we need to remember that cv.glmnet takes a matrix of predictors and a matrix of response variables [Reference 4]. 
+```{r}
+# Build a formula
+fmla <- as.formula("class ~ seismic + seismoacoustic + shift + ghazard + nbumps + nbumps2 + nbumps3 + nbumps4 + nbumps5 + nbumps6 + nbumps7 + nbumps89")
+
+# Build a model matrix object.
+seismic_train_mmatrix <- model.matrix(fmla, data = seismicData.train)
+
+# Pass matrix and response vector to cv.glmnet
+cvfit <- cv.glmnet(seismic_train_mmatrix, seismic_train_class, family= "binomial", type.measure = "class")
+
+plot(cvfit)
+
+
+```
+
+Use this model to predict on the test data.
+```{r}
+# Get the training set predictions
+fit.pred <- predict(cvfit, newx = seismic_train_mmatrix, type = "response")
+head(fit.pred)
+```
+
+Using these probabilities and the original response draw the ROC curves.
+```{r}
+pred <- prediction(fit.pred, seismic_train_class)
+roc.perf <- performance(pred, measure = "tpr", x.measure = "fpr")
+auc.train <- performance(pred, measure = "auc")
+auc.train <- auc.train@y.values
+
+#Plot ROC
+plot(roc.perf)
+abline(a=0, b= 1) #Ref line indicating poor performance
+text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
+```
+
 
 ## Logistic Regression Model
 
@@ -259,13 +323,38 @@ summary(seismic_model)
 
 ## Evaluating the model performance. 
 
+
+
+
+
 ## Comparing the performance of classification techniques. 
+
+- Use logistic regression
+- Use Decision trees
+- Use Naive Baise 
+- Use any other 
+
+Compare the performance of the each of these classification techniques.
+
+
+
+
+Use cv.glmnet to do the do the training and prediction using only the continuous variables.
+Research if you need to use nbumps as a categorical variable. 
+How to do one-hot encoding in R ? does it automatically do this for factor variables ?
+Run the model using all factor and continuous variables. 
+Shuffle the response variable since we have an imbalance. 
+
+
+
+
 
 ## References
 
   * [Application of rule induction algorithms for analysis of data collected by seismic  hazard monitoring systems in coal mines.](https://actamont.tuke.sk/pdf/2013/n4/7sikora.pdf)
   * [A Study of Rockburst Hazard Evaluation Method in Coal Mine](https://www.hindawi.com/journals/sv/2016/8740868/#B13)
   * [Classification: Basic concepts, decision trees and model evaluation](https://www-users.cs.umn.edu/~kumar001/dmbook/ch4.pdf)
+  * [Stackoverflow: Using glmnet with categorical predictors](https://stats.stackexchange.com/questions/69804/group-categorical-variables-in-glmnet)
 
 
 

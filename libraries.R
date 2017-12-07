@@ -11,7 +11,7 @@ libs <- c("readr", "dplyr", "tidyr", "ggplot2",
           "corrplot", "GGally", "broom", "psych",
           "car", "vtreat", "caret", "mlbench",
           "caTools", "rio", "ranger", "pROC",
-          "reshape", "cowplot"
+          "reshape", "cowplot", "glmnet", "ROCR"
           )
 
 installRequiredPackages(libs)
