@@ -10,7 +10,9 @@ Shravan Kuchkula, Dave Dyer, Tommy Pompo
 -   [Exploratory Data Analysis](#exploratory-data-analysis)
     -   [How are nbumps distributed ?](#how-are-nbumps-distributed)
     -   [Logistic Regression Assumptions](#logistic-regression-assumptions)
--   [Logistic Regression Model](#logistic-regression-model)
+-   [Logistic Regression using cv.glmnet with balanced dataset with train/test split](#logistic-regression-using-cv.glmnet-with-balanced-dataset-with-traintest-split)
+-   [Cross Validation](#cross-validation)
+-   [Logistic Regression Model first take](#logistic-regression-model-first-take)
 -   [Evaluating the model performance.](#evaluating-the-model-performance.)
 -   [Comparing the performance of classification techniques.](#comparing-the-performance-of-classification-techniques.)
 -   [References](#references)
@@ -156,8 +158,168 @@ corrplot(M, method="pie", type = "lower")
 
 ![](Seismic_files/figure-markdown_github/unnamed-chunk-9-1.png)
 
-Logistic Regression Model
--------------------------
+Logistic Regression using cv.glmnet with balanced dataset with train/test split
+-------------------------------------------------------------------------------
+
+We will first balance the class variable so that there are approximately equal number of hazardous vs non-hazardous cases.
+
+``` r
+# Reimport the dataset and start fresh
+sb <- import("seismic-bumps.arff")
+
+# Extract non-hazardous observations
+nonh <- sb %>%
+  filter(class == 0)
+
+# Randomly choose 200 observations
+nonh <- nonh[sample(1:nrow(nonh), 200), ]
+
+# Extract hazardous observations
+h <- sb %>%
+  filter(class == 1)
+
+# Combine the nonh and h dataframes
+balancedSB <- rbind(nonh, h)
+
+# Shuffle the dataframe
+balancedSB <- balancedSB[sample(1:nrow(balancedSB)),]
+```
+
+Next, we will split the dataset into training (75%) and test (25%) datasets.
+
+``` r
+# Calculate N
+N <- nrow(balancedSB)
+
+# Create a random number vector
+rvec <- runif(N)
+
+# Select rows from the dataframe
+balancedSB.train <- balancedSB[rvec < 0.75,]
+balancedSB.test <- balancedSB[rvec >= 0.75,]
+
+# Select rows for the class variable
+train_class <- balancedSB.train$class
+test_class <- balancedSB.test$class
+```
+
+Next, we build the model.
+
+``` r
+#Build the formula for model.matrix
+formula <- as.formula("class ~ .")
+
+#Build the model matrix object from the training data
+balancedSBmatrix <- model.matrix(formula, data = balancedSB.train)
+
+# Pass the matrix and class vector
+cvfit <- cv.glmnet(balancedSBmatrix, train_class, family = "binomial", type.measure = "class")
+
+# plot the model
+plot(cvfit)
+```
+
+![](Seismic_files/figure-markdown_github/unnamed-chunk-12-1.png)
+
+We are essentially looking for the lamba value which yeilds the lowest miss-classification error. That lamba value will be the number of coefficients that are contributing the most.
+
+Check the coefficients
+
+``` r
+coef(cvfit, s = "lambda.min")
+```
+
+    ## 22 x 1 sparse Matrix of class "dgCMatrix"
+    ##                             1
+    ## (Intercept)     -1.5245096810
+    ## (Intercept)      .           
+    ## seismicb         0.3035483069
+    ## seismoacousticb  .           
+    ## seismoacousticc  .           
+    ## shiftW           0.5304594126
+    ## genergy          .           
+    ## gpuls            0.0006050523
+    ## gdenergy         .           
+    ## gdpuls           .           
+    ## ghazardb         .           
+    ## ghazardc         .           
+    ## nbumps           0.2203920844
+    ## nbumps2          .           
+    ## nbumps3          0.1606958127
+    ## nbumps4          .           
+    ## nbumps5          .           
+    ## nbumps6          .           
+    ## nbumps7          .           
+    ## nbumps89         .           
+    ## energy           .           
+    ## maxenergy        .
+
+**Prediction**:
+
+We will use the above model to predict on the test dataset.
+
+``` r
+# Since predict function expects a matrix to be passed to newx
+# Note the use of balancedSB.test here instead of train
+balancedSBmatrix <- model.matrix(formula, data = balancedSB.test)
+
+# predict on the test data, use type = "response" to get prediction probabilities
+pred <- predict(cvfit, newx = balancedSBmatrix, type = "response")
+
+# create a prediction object
+predObj <- prediction(pred, test_class)
+```
+
+**Prediction Performance**:
+
+``` r
+# Measure the performance using true positive rate vs false positive rate
+myroc.perf <- performance(predObj, measure = "tpr", x.measure = "fpr")
+
+# Measure the performance using AUC
+auc.test <- performance(predObj, measure = "auc")
+
+# Get the AUC value to display on the ROC plot
+auc.value <- auc.test@y.values
+
+# Plot the ROC with AUC value
+plot(myroc.perf)
+abline(a=0, b= 1) #Ref line indicating poor performance
+text(x = .40, y = .6,paste("AUC = ", round(auc.value[[1]],3), sep = ""))
+```
+
+![](Seismic_files/figure-markdown_github/unnamed-chunk-15-1.png)
+
+Note: The effect of balancing the class variable can be observed in the below table:
+
+200 -&gt; AUC was close to 80% 500 -&gt; AUC was close to 75% 1000 -&gt; AUC was close to 50%
+
+This shows that logistic regression model's performance is largely dependent on having a balanced class variable.
+
+Cross Validation
+----------------
+
+Work in progress....
+
+``` r
+# Reimport the dataset and start fresh
+sb <- import("seismic-bumps.arff")
+
+# Extract non-hazardous observations
+nonh <- sb %>%
+  filter(class == 0)
+
+
+
+
+# Number of Cross validation loops
+nloops <- 50
+
+# Number of samples in training data set
+```
+
+Logistic Regression Model first take
+------------------------------------
 
 Fit a logistic regression model with what you think could be contributing to the seismic hazard.
 
@@ -249,61 +411,10 @@ This illustrates that "rare events" create challenges for classification models.
 Calculate ROC Curves and AUC: The previous exercises have demonstrated that accuracy is a very misleading measure of model performance on imbalanced datasets. Graphing the model's performance better illustrates the tradeoff between a model that is overly agressive and one that is overly passive. Here we will create a ROC curve and compute the area under the curve (AUC) to evaluate the logistic regression model that we created above.
 
 ``` r
-ROC <- roc(seismicDataPredictions$class, seismicDataPredictions$prob)
-plot(ROC, col = "blue")
-text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
+#ROC <- roc(seismicDataPredictions$class, seismicDataPredictions$prob)
+#plot(ROC, col = "blue")
+#text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
 ```
-
-![](Seismic_files/figure-markdown_github/unnamed-chunk-16-1.png)
-
-Dummy variables, missing data and interactions:
-
-``` r
-seismic_model <- glm(class ~ . , data = seismicData, family = "binomial")
-summary(seismic_model)
-```
-
-    ## 
-    ## Call:
-    ## glm(formula = class ~ ., family = "binomial", data = seismicData)
-    ## 
-    ## Deviance Residuals: 
-    ##     Min       1Q   Median       3Q      Max  
-    ## -2.1035  -0.3637  -0.2827  -0.1781   3.0300  
-    ## 
-    ## Coefficients: (3 not defined because of singularities)
-    ##                   Estimate Std. Error z value Pr(>|z|)    
-    ## (Intercept)     -4.426e+00  2.695e-01 -16.425  < 2e-16 ***
-    ## seismicb         3.079e-01  1.844e-01   1.670  0.09500 .  
-    ## seismoacousticb  3.625e-02  1.866e-01   0.194  0.84596    
-    ## seismoacousticc  5.049e-01  6.767e-01   0.746  0.45563    
-    ## shiftW           8.186e-01  2.926e-01   2.798  0.00515 ** 
-    ## genergy         -7.967e-07  4.561e-07  -1.747  0.08066 .  
-    ## gpuls            9.443e-04  2.148e-04   4.397  1.1e-05 ***
-    ## gdenergy        -1.106e-03  2.115e-03  -0.523  0.60094    
-    ## gdpuls          -2.337e-03  2.855e-03  -0.819  0.41302    
-    ## ghazardb        -9.745e-03  3.448e-01  -0.028  0.97746    
-    ## ghazardc        -1.390e+01  4.250e+02  -0.033  0.97391    
-    ## nbumps           3.862e+00  1.460e+00   2.645  0.00817 ** 
-    ## nbumps2         -3.478e+00  1.465e+00  -2.374  0.01760 *  
-    ## nbumps3         -3.452e+00  1.461e+00  -2.362  0.01819 *  
-    ## nbumps4         -3.778e+00  1.522e+00  -2.482  0.01307 *  
-    ## nbumps5         -2.076e+00  2.625e+00  -0.791  0.42915    
-    ## nbumps6                 NA         NA      NA       NA    
-    ## nbumps7                 NA         NA      NA       NA    
-    ## nbumps89                NA         NA      NA       NA    
-    ## energy          -9.632e-06  3.159e-05  -0.305  0.76042    
-    ## maxenergy        1.771e-06  3.121e-05   0.057  0.95475    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## (Dispersion parameter for binomial family taken to be 1)
-    ## 
-    ##     Null deviance: 1253.8  on 2583  degrees of freedom
-    ## Residual deviance: 1073.2  on 2566  degrees of freedom
-    ## AIC: 1109.2
-    ## 
-    ## Number of Fisher Scoring iterations: 15
 
 Evaluating the model performance.
 ---------------------------------

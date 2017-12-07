@@ -238,7 +238,144 @@ M <- round(cor(seismicDataNumeric), 2)
 corrplot(M, method="pie", type = "lower")
 ```
 
-## Logistic Regression Model
+## Logistic Regression using cv.glmnet with balanced dataset with train/test split
+
+We will first balance the class variable so that there are approximately equal number of hazardous vs non-hazardous cases.
+```{r}
+# Reimport the dataset and start fresh
+sb <- import("seismic-bumps.arff")
+
+# Extract non-hazardous observations
+nonh <- sb %>%
+  filter(class == 0)
+
+# Randomly choose 200 observations
+nonh <- nonh[sample(1:nrow(nonh), 200), ]
+
+# Extract hazardous observations
+h <- sb %>%
+  filter(class == 1)
+
+# Combine the nonh and h dataframes
+balancedSB <- rbind(nonh, h)
+
+# Shuffle the dataframe
+balancedSB <- balancedSB[sample(1:nrow(balancedSB)),]
+
+```
+
+Next, we will split the dataset into training (75%) and test (25%) datasets.
+
+```{r}
+# Calculate N
+N <- nrow(balancedSB)
+
+# Create a random number vector
+rvec <- runif(N)
+
+# Select rows from the dataframe
+balancedSB.train <- balancedSB[rvec < 0.75,]
+balancedSB.test <- balancedSB[rvec >= 0.75,]
+
+# Select rows for the class variable
+train_class <- balancedSB.train$class
+test_class <- balancedSB.test$class
+
+```
+
+Next, we build the model. 
+
+```{r}
+#Build the formula for model.matrix
+formula <- as.formula("class ~ .")
+
+#Build the model matrix object from the training data
+balancedSBmatrix <- model.matrix(formula, data = balancedSB.train)
+
+# Pass the matrix and class vector
+cvfit <- cv.glmnet(balancedSBmatrix, train_class, family = "binomial", type.measure = "class")
+
+# plot the model
+plot(cvfit)
+```
+
+We are essentially looking for the lamba value which yeilds the lowest miss-classification error. That lamba value will be the number of coefficients that are contributing the most.
+
+Check the coefficients
+
+```{r}
+coef(cvfit, s = "lambda.min")
+```
+
+**Prediction**:
+
+We will use the above model to predict on the test dataset. 
+
+```{r}
+# Since predict function expects a matrix to be passed to newx
+# Note the use of balancedSB.test here instead of train
+balancedSBmatrix <- model.matrix(formula, data = balancedSB.test)
+
+# predict on the test data, use type = "response" to get prediction probabilities
+pred <- predict(cvfit, newx = balancedSBmatrix, type = "response")
+
+# create a prediction object
+predObj <- prediction(pred, test_class)
+
+```
+
+**Prediction Performance**:
+```{r}
+# Measure the performance using true positive rate vs false positive rate
+myroc.perf <- performance(predObj, measure = "tpr", x.measure = "fpr")
+
+# Measure the performance using AUC
+auc.test <- performance(predObj, measure = "auc")
+
+# Get the AUC value to display on the ROC plot
+auc.value <- auc.test@y.values
+
+# Plot the ROC with AUC value
+plot(myroc.perf)
+abline(a=0, b= 1) #Ref line indicating poor performance
+text(x = .40, y = .6,paste("AUC = ", round(auc.value[[1]],3), sep = ""))
+
+```
+
+Note: The effect of balancing the class variable can be observed in the below table:
+
+200 -> AUC was close to 80%
+500 -> AUC was close to 75%
+1000 -> AUC was close to 50%
+
+This shows that logistic regression model's performance is largely dependent on having a balanced class variable.
+
+## Cross Validation
+
+Work in progress....
+```{r}
+# Reimport the dataset and start fresh
+sb <- import("seismic-bumps.arff")
+
+# Extract non-hazardous observations
+nonh <- sb %>%
+  filter(class == 0)
+
+
+
+
+# Number of Cross validation loops
+nloops <- 50
+
+# Number of samples in training data set
+```
+
+
+
+
+
+
+## Logistic Regression Model first take
 
 Fit a logistic regression model with what you think could be contributing to the seismic hazard. 
 
@@ -295,17 +432,11 @@ Calculate ROC Curves and AUC:
 The previous exercises have demonstrated that accuracy is a very misleading measure of model performance on imbalanced datasets. Graphing the model's performance better illustrates the tradeoff between a model that is overly agressive and one that is overly passive. Here we will create a ROC curve and compute the area under the curve (AUC) to evaluate the logistic regression model that we created above.
 
 ```{r}
-ROC <- roc(seismicDataPredictions$class, seismicDataPredictions$prob)
-plot(ROC, col = "blue")
-text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
+#ROC <- roc(seismicDataPredictions$class, seismicDataPredictions$prob)
+#plot(ROC, col = "blue")
+#text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
 ```
 
-Dummy variables, missing data and interactions:
-
-```{r}
-seismic_model <- glm(class ~ . , data = seismicData, family = "binomial")
-summary(seismic_model)
-```
 
 ## Evaluating the model performance. 
 
