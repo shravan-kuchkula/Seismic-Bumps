@@ -23,6 +23,7 @@ The dangers associated with coal mining are myriad; black lung, flammable gas po
 Our analysis attempts to use logistic regression techniques to predict whether a seismic 'bump' is predictive of a notable seismic hazard.  We attempt to characterize our prediction accuracy and compare the results against the state of the art results from other statistical and machine learning techniques, that are included within the data set.
 
 ## Getting the data
+
 ```{r message=FALSE, warning=FALSE}
 source("libraries.R")
 #url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00266/seismic-bumps.arff"
@@ -238,6 +239,10 @@ M <- round(cor(seismicDataNumeric), 2)
 corrplot(M, method="pie", type = "lower")
 ```
 
+## Problem with unbalanced class variable
+<Explain the problem we faced while using the dataset as is>
+
+
 ## Logistic Regression using cv.glmnet with balanced dataset with train/test split
 
 We will first balance the class variable so that there are approximately equal number of hazardous vs non-hazardous cases.
@@ -350,9 +355,10 @@ Note: The effect of balancing the class variable can be observed in the below ta
 
 This shows that logistic regression model's performance is largely dependent on having a balanced class variable.
 
-## Cross Validation
+## Evaluating model performance using Cross Validation
 
-Work in progress....
+Using cross validation we can assess how well our model building process works. The idea is that we can know how well our model will perform on new data not yet collected. We will use AUC as the performance metric.
+
 ```{r}
 # Reimport the dataset and start fresh
 sb <- import("seismic-bumps.arff")
@@ -361,84 +367,93 @@ sb <- import("seismic-bumps.arff")
 nonh <- sb %>%
   filter(class == 0)
 
+# Randomly choose 200 observations
+nonh <- nonh[sample(1:nrow(nonh), 200), ]
 
+# Extract hazardous observations
+h <- sb %>%
+  filter(class == 1)
 
+# Combine the nonh and h dataframes
+balancedSB <- rbind(nonh, h)
 
-# Number of Cross validation loops
+# Shuffle the dataframe
+balancedSB <- balancedSB[sample(1:nrow(balancedSB)),]
+
+# Extract the class variable into a vector call it "dat.train.y"
+dat.train.y <- balancedSB$class
+
+# Create a model matrix using the entire balancedSB. 
+# Earlier we split this into training/test data. 
+# Now we are going do that within the loop. 
+
+dat.train.x <- model.matrix(as.formula("class ~ ."), data = balancedSB)
+```
+
+Now we are ready for the cross-validation loop
+
+```{r}
+# Define the number of cross-validation loops
 nloops <- 50
 
-# Number of samples in training data set
+# Number of observations in the training (i.e full) dataset
+ntrains <- nrow(dat.train.x)
+
+# Create an empty vector to hold all the AUC result.
+# Later we will display each run's AUC in a histogram
+cv.aucs <- c()
+```
+
+Run the cross validation
+
+```{r warning= FALSE}
+for (i in 1:nloops){
+  
+ # Get the indexes using sample
+ index<-sample(1:ntrains,60)
+ 
+ # randomly draw 60 observations from front and call it training set
+ cvtrain.x<-as.matrix(dat.train.x[index,])
+ 
+ # randomly draw 60 observations from back and call it test set
+ cvtest.x<-as.matrix(dat.train.x[-index,])
+ 
+ # Get the corresponding class variable
+ cvtrain.y<-dat.train.y[index]
+ cvtest.y<-dat.train.y[-index]
+ 
+ ## Model fitting:
+ # Call cv.glmnet to fit the model using training set
+ cvfit <- cv.glmnet(cvtrain.x, cvtrain.y, family = "binomial", type.measure = "class")
+ 
+ ## Prediction:
+ # Predict using test set using the above model. Use type = "response" to get prediction probabilities.
+ fit.pred <- predict(cvfit, newx = cvtest.x, type = "response")
+ # Prediction function takes prediction probabilities as first arg and class to compare as its second arg
+ pred <- prediction(fit.pred[,1], cvtest.y)
+ 
+ ## Prediction Performance:
+ # Check prediction performance
+ roc.perf = performance(pred, measure = "tpr", x.measure = "fpr")
+ auc.train <- performance(pred, measure = "auc")
+ auc.train <- auc.train@y.values
+ 
+ # Store the auc value for this run into the vector
+ cv.aucs[i]<-auc.train[[1]]
+
+}
+ 
 ```
 
 
-
-
-
-
-## Logistic Regression Model first take
-
-Fit a logistic regression model with what you think could be contributing to the seismic hazard. 
-
+Draw a historgram of cv.aucs
 ```{r}
-seismic_model <- glm(class ~ seismic + seismoacoustic + shift + ghazard,
-                     data = seismicData, family = "binomial")
-
-summary(seismic_model)
+hist(cv.aucs)
 ```
 
-Making a binary prediction:
-We used the glm() function to build a logistic regression model of the `class` variable. As with many of R's machine learning methods, you can apply the `predict()` function to the model object to forecast future behavior. By default, predict() outputs predictions in terms of log odds unless `type = "response"` is specified. This converts the log odds to probabilities.
-
-Because a logistic regression model estimates the probability of the outcome, it is up to you to determine the threshold at which the probability implies action. One must balance the extremes of being too cautious versus being too aggressive. For example, if we classify an observation which has a probability of being in class 1 as 99% or greater, then we may miss out on some observations that may indeed be class 1 but were classified as class 0. This balance is particularly important to consider for severely imbalanced outcomes, such as in this dataset where class 1 are relatively rare.
-
-```{r}
-# make a copy
-seismicDataPredictions <- seismicData
-
-# Estimate the probability of class 1
-seismicDataPredictions$prob <- predict(seismic_model, type = "response")
-```
-
-Find the actual probability of an observation to be in class 1.
-```{r}
-mean(as.numeric(as.character(seismicData$class)))
-```
-
-We will use this as our cut-off threshold.
-
-```{r}
-seismicDataPredictions$pred <- ifelse(seismicDataPredictions$prob > 0.0657, 1, 0)
-```
-
-Now calculate the model accuracy:
-```{r}
-mean(seismicDataPredictions$pred == seismicDataPredictions$class)
-```
-
-This shows that the logistic regression model with all the factor variables made a correct prediction 44% of the time. 
-
-What would be the accuracy of the model if a model had simply predicted class 0 for each observation ?
-
-```{r}
-seismicDataPredictions$predNull <- 0
-mean(seismicDataPredictions$predNull == seismicDataPredictions$class)
-```
-
-With an accuracy of 44% the model is actually performing worse than if it were to predict class 0 for every record.
-
-This illustrates that "rare events" create challenges for classification models. When 1 outcome is very rare predicting the opposite can result in very high accuracy. 
-
-Calculate ROC Curves and AUC:
-The previous exercises have demonstrated that accuracy is a very misleading measure of model performance on imbalanced datasets. Graphing the model's performance better illustrates the tradeoff between a model that is overly agressive and one that is overly passive. Here we will create a ROC curve and compute the area under the curve (AUC) to evaluate the logistic regression model that we created above.
-
-```{r}
-#ROC <- roc(seismicDataPredictions$class, seismicDataPredictions$prob)
-#plot(ROC, col = "blue")
-#text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
-```
+This indicates that a majority of time our model prediction performance lies between 70 to 75% 
 
 
-## Evaluating the model performance. 
 
 ## Comparing the performance of classification techniques. 
 

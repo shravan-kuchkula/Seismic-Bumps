@@ -1,0 +1,424 @@
+---
+title: "mySeismic.Rmd"
+author: "Shravan Kuchkula"
+date: "11/23/2017"
+output:
+  github_document:
+    toc: yes
+  html_document:
+    keep_md: yes
+    theme: cosmo
+    toc: yes
+  pdf_document:
+    fig_caption: yes
+    highlight: zenburn
+---
+
+## Introduction
+
+Mining activity was and is always connected with the occurrence of dangers which are commonly called mining hazards. A special case of such threat is a seismic hazard which frequently occurs in many underground mines. Seismic hazard is the hardest detectable and predictable of natural hazards and in this respect it is comparable to an earthquake. More and more advanced seismic and seismoacoustic monitoring systems allow a better understanding rock mass processes and definition of seismic hazard prediction methods. Accuracy of so far created methods is however far from perfect. Complexity of seismic processes and big disproportion between the number of low-energy seismic events and the number of high-energy phenomena (e.g. > 10^4J) causes the statistical techniques to be insufficient to predict seismic hazard.
+
+The data describe the problem of high energy (higher than 10^4 J) seismic bumps forecasting in a coal mine. Data come from two of longwalls located in a Polish coal mine.
+
+## Getting the data
+
+```{r message=FALSE, warning=FALSE}
+source("libraries.R")
+```
+
+
+```{r message=FALSE, warning=FALSE}
+#url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00266/seismic-bumps.arff"
+#download.file(url, "seismic-bumps.arff")
+seismicData <- import("seismic-bumps.arff")
+glimpse(seismicData)
+```
+
+## Data set description
+
+  * **seismic**: result of shift seismic hazard assessment in the mine working obtained by the seismic method (a - lack of hazard, b - low hazard, c - high hazard, d - danger state); 
+  * **seismoacoustic**: result of shift seismic hazard assessment in the mine working obtained by the seismoacoustic method; 
+  * **shift**: information about type of a shift (W - coal-getting, N -preparation shift); 
+  * **genergy**: seismic energy recorded within previous shift by the most active geophone (GMax) out of geophones monitoring the longwall; 
+  * **gpuls**: a number of pulses recorded within previous shift by GMax; 
+  * **gdenergy**: a deviation of energy recorded within previous shift by GMax from average energy recorded during eight previous shifts; 
+  * **gdpuls**: a deviation of a number of pulses recorded within previous shift by GMax from average number of pulses recorded during eight previous shifts; 
+  * **ghazard**: result of shift seismic hazard assessment in the mine working obtained by the seismoacoustic method based on registration coming form GMax only; 
+  * **nbumps**: the number of seismic bumps recorded within previous shift; 
+  * **nbumps2**: the number of seismic bumps (in energy range [10^2,10^3)) registered within previous shift; 
+  * **nbumps3**: the number of seismic bumps (in energy range [10^3,10^4)) registered within previous shift; 
+  * **nbumps4**: the number of seismic bumps (in energy range [10^4,10^5)) registered within previous shift; 
+  * **nbumps5**: the number of seismic bumps (in energy range [10^5,10^6)) registered within the last shift; 
+  * **nbumps6**: the number of seismic bumps (in energy range [10^6,10^7)) registered within previous shift; 
+  * **nbumps7**: the number of seismic bumps (in energy range [10^7,10^8)) registered within previous shift; 
+  * **nbumps89**: the number of seismic bumps (in energy range [10^8,10^10)) registered within previous shift;
+  * **energy**: total energy of seismic bumps registered within previous shift; 
+  * **maxenergy**: the maximum energy of the seismic bumps registered within previous shift; 
+  * **class**: the decision attribute - '1' means that high energy seismic bump occurred in the next shift ('hazardous state'), '0' means that no high energy seismic bumps occurred in the next shift ('non-hazardous state').
+
+## Exploratory Data Analysis
+
+### How many observations are "hazardous state (class = 1)" and "non-hazardous state (class = 0)" ?
+
+```{r}
+table(seismicData$class)
+```
+
+### How are nbumps distributed ?
+
+Distribution of all nbumps: Use `cowplot` to display all nbumps in a grid.
+```{r echo=FALSE, message=FALSE}
+library(cowplot)
+
+p1 <- seismicData %>%
+  ggplot(aes(x = nbumps)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p2 <- seismicData %>%
+  ggplot(aes(x = nbumps2)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p3 <- seismicData %>%
+  ggplot(aes(x = nbumps3)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p4 <- seismicData %>%
+  ggplot(aes(x = nbumps4)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p5 <- seismicData %>%
+  ggplot(aes(x = nbumps5)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p6 <- seismicData %>%
+  ggplot(aes(x = nbumps6)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p7 <- seismicData %>%
+  ggplot(aes(x = nbumps7)) +
+  geom_histogram() + 
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+p89 <- seismicData %>%
+  ggplot(aes(x = nbumps89)) +
+  geom_histogram() +
+  theme(axis.text.y = element_text(size = 6), axis.text.x = element_text(size = 6),
+        axis.title.y = element_text(size = 10), axis.title.x = element_text(size = 10),
+        axis.ticks = element_blank())
+
+plot_grid(p1, p2, p3, p4, p5, p6, p7, p89, ncol = 2)
+
+```
+
+
+### Check for multi-collinearity
+
+Collect all the numeric variables and check for multi-collinearity:
+
+```{r}
+seismicDataNumeric <- seismicData %>%
+  select(genergy, gpuls, gdenergy, gdpuls, energy, maxenergy)
+```
+
+```{r}
+# Create the correlation matrix
+M <- round(cor(seismicDataNumeric), 2)
+
+# Create corrplot
+corrplot(M, method="pie", type = "lower")
+```
+
+### Variable Types and Cardinality
+
+One of the things we need to do to prepare for logistic regression using most ML libraries is to encode the categorical variables using dummy encoding or one-hot encoding.  In order to do that, and not deal with a prohibitively wide data set, we need to understand the cardinality of the variables and classify them accordingly.  
+
+```{r include=FALSE}
+#source("libraries.R")
+#seismicData <- import("seismic-bumps.arff")
+seismicSummary <- seismicData %>%
+    summarise_all(funs("Total" = n(),
+                  "Nulls" = sum(is.na(.)),
+                  "Filled" = sum(!is.na(.)),
+                  "Cardinality" = length(unique(.)))) %>%
+    melt() %>%
+    separate(variable, into = c('variable', 'measure'), sep="_") %>%
+    spread(measure, value)  %>%
+    mutate(Complete = Filled/Total,
+           Uniqueness = Cardinality/Total,
+           Distinctness = Cardinality/Filled)
+```
+```{r}
+seismicSummary
+```
+
+Based solely on the cardinality of values, it would appear that at least 5 variables (energy, gdenergy, gdpuls, genergy, and gpuls) are too continuous to dummy encode.  The rest of the varialbes are feasible (at least) for one-hot / dummy encoding.  The actual categorical variables are listed with their levels below, but #TODO: We will investigate treating numeric variables as categorical in about half of the remaining variables, so they can be used as predictor features for the 'class' outcome variable.
+
+```{r echo = FALSE}
+seismicLevels <- seismicData %>%
+    sapply(levels)
+glimpse(seismicLevels)
+```
+
+However, some of the numeric values only contain a handful of discrete values which can be viewed as coded categorical variables.  In particular, maxenergy and the 'nbumps(n)' variables can be treated as categorical.  So, in short, we see the following breakdown in variable types:
+
+```{r include=FALSE}
+categorical <- c("seismic", "seismoacoustic", "shift", "ghazard", "nbumps", "nbumps2", "nbumps3", "nbumps4", "nbumps5", "nbumps6", "nbumps7", "nbumps89", "class")
+continuous <- c("genergy", "gdpuls", "energy", "maxenergy")
+```
+
+The categorical variables are `r categorical` and the continuous variables are `r continuous`.  The output variable is 'class'.
+
+## Variable Screening
+
+Approach 1: Convert all nbumps to categorical variables.
+Approach 2: Treat nbumps as a continuous varaible. 
+
+We can assess how well our model building process works through Cross validation. The idea is that we can get an idea of how well the approach is going to perform on new data not yet collected. We will use AUC as the performance matrix.
+
+```{r}
+# Calculate N
+N <- nrow(seismicData)
+
+# Create a random number vector
+rvec <- runif(N)
+
+# Select rows from the dataframe
+seismicData.train <- seismicData[rvec < 0.75,]
+seismicData.test <- seismicData[rvec >= 0.75,]
+
+# Select rows for the class variable
+seismic_train_class <- seismicData.train$class
+seismic_test_class <- seismicData.test$class
+
+nrow(seismicData.train)
+nrow(seismicData.test)
+
+```
+
+Build the logistic regression model using all the predictors using the training dataset. Before using the glmnet function, we need to remember that cv.glmnet takes a matrix of predictors and a matrix of response variables [Reference 4]. 
+```{r}
+# Build a formula
+fmla <- as.formula("class ~ seismic + seismoacoustic + shift + ghazard + nbumps + nbumps2 + nbumps3 + nbumps4 + nbumps5 + nbumps6 + nbumps7 + nbumps89")
+
+# Build a model matrix object.
+seismic_train_mmatrix <- model.matrix(fmla, data = seismicData.train)
+
+# Pass matrix and response vector to cv.glmnet
+cvfit <- cv.glmnet(seismic_train_mmatrix, seismic_train_class, family= "binomial", type.measure = "class")
+
+plot(cvfit)
+
+
+```
+
+Use this model to predict on the test data.
+```{r}
+# Get the training set predictions
+fit.pred <- predict(cvfit, newx = seismic_train_mmatrix, type = "response")
+head(fit.pred)
+```
+
+Using these probabilities and the original response draw the ROC curves.
+```{r}
+pred <- prediction(fit.pred, seismic_train_class)
+roc.perf <- performance(pred, measure = "tpr", x.measure = "fpr")
+auc.train <- performance(pred, measure = "auc")
+auc.train <- auc.train@y.values
+
+#Plot ROC
+plot(roc.perf)
+abline(a=0, b= 1) #Ref line indicating poor performance
+text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
+```
+
+
+## Logistic Regression Model
+
+Fit a logistic regression model with what you think could be contributing to the seismic hazard. 
+
+```{r}
+seismic_model <- glm(class ~ seismic + seismoacoustic + shift + ghazard,
+                     data = seismicData, family = "binomial")
+
+summary(seismic_model)
+```
+
+Making a binary prediction:
+We used the glm() function to build a logistic regression model of the `class` variable. As with many of R's machine learning methods, you can apply the `predict()` function to the model object to forecast future behavior. By default, predict() outputs predictions in terms of log odds unless `type = "response"` is specified. This converts the log odds to probabilities.
+
+Because a logistic regression model estimates the probability of the outcome, it is up to you to determine the threshold at which the probability implies action. One must balance the extremes of being too cautious versus being too aggressive. For example, if we classify an observation which has a probability of being in class 1 as 99% or greater, then we may miss out on some observations that may indeed be class 1 but were classified as class 0. This balance is particularly important to consider for severely imbalanced outcomes, such as in this dataset where class 1 are relatively rare.
+
+```{r}
+# make a copy
+seismicDataPredictions <- seismicData
+
+# Estimate the probability of class 1
+seismicDataPredictions$prob <- predict(seismic_model, type = "response")
+```
+
+Find the actual probability of an observation to be in class 1.
+```{r}
+mean(as.numeric(as.character(seismicData$class)))
+```
+
+We will use this as our cut-off threshold.
+
+```{r}
+seismicDataPredictions$pred <- ifelse(seismicDataPredictions$prob > 0.0657, 1, 0)
+```
+
+Now calculate the model accuracy:
+```{r}
+mean(seismicDataPredictions$pred == seismicDataPredictions$class)
+```
+
+This shows that the logistic regression model with all the factor variables made a correct prediction 44% of the time. 
+
+What would be the accuracy of the model if a model had simply predicted class 0 for each observation ?
+
+```{r}
+seismicDataPredictions$predNull <- 0
+mean(seismicDataPredictions$predNull == seismicDataPredictions$class)
+```
+
+With an accuracy of 44% the model is actually performing worse than if it were to predict class 0 for every record.
+
+This illustrates that "rare events" create challenges for classification models. When 1 outcome is very rare predicting the opposite can result in very high accuracy. 
+
+Calculate ROC Curves and AUC:
+The previous exercises have demonstrated that accuracy is a very misleading measure of model performance on imbalanced datasets. Graphing the model's performance better illustrates the tradeoff between a model that is overly agressive and one that is overly passive. Here we will create a ROC curve and compute the area under the curve (AUC) to evaluate the logistic regression model that we created above.
+
+```{r}
+ROC <- roc(seismicDataPredictions$class, seismicDataPredictions$prob)
+plot(ROC, col = "blue")
+text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
+```
+
+Dummy variables, missing data and interactions:
+
+```{r}
+seismic_model <- glm(class ~ . , data = seismicData, family = "binomial")
+summary(seismic_model)
+```
+
+## Evaluating the model performance. 
+
+
+
+
+
+## Comparing the performance of classification techniques. 
+
+- Use logistic regression
+- Use Decision trees
+- Use Naive Baise 
+- Use any other 
+
+Compare the performance of the each of these classification techniques.
+
+
+
+
+Use cv.glmnet to do the do the training and prediction using only the continuous variables.
+Research if you need to use nbumps as a categorical variable. 
+How to do one-hot encoding in R ? does it automatically do this for factor variables ?
+Run the model using all factor and continuous variables. 
+Shuffle the response variable since we have an imbalance. 
+Try balancing out the response variable.
+
+
+## Logistic Regression Model first take
+
+Fit a logistic regression model with what you think could be contributing to the seismic hazard. 
+
+```{r}
+seismic_model <- glm(class ~ seismic + seismoacoustic + shift + ghazard,
+                     data = seismicData, family = "binomial")
+
+summary(seismic_model)
+```
+
+Making a binary prediction:
+We used the glm() function to build a logistic regression model of the `class` variable. As with many of R's machine learning methods, you can apply the `predict()` function to the model object to forecast future behavior. By default, predict() outputs predictions in terms of log odds unless `type = "response"` is specified. This converts the log odds to probabilities.
+
+Because a logistic regression model estimates the probability of the outcome, it is up to you to determine the threshold at which the probability implies action. One must balance the extremes of being too cautious versus being too aggressive. For example, if we classify an observation which has a probability of being in class 1 as 99% or greater, then we may miss out on some observations that may indeed be class 1 but were classified as class 0. This balance is particularly important to consider for severely imbalanced outcomes, such as in this dataset where class 1 are relatively rare.
+
+```{r}
+# make a copy
+seismicDataPredictions <- seismicData
+
+# Estimate the probability of class 1
+seismicDataPredictions$prob <- predict(seismic_model, type = "response")
+```
+
+Find the actual probability of an observation to be in class 1.
+```{r}
+mean(as.numeric(as.character(seismicData$class)))
+```
+
+We will use this as our cut-off threshold.
+
+```{r}
+seismicDataPredictions$pred <- ifelse(seismicDataPredictions$prob > 0.0657, 1, 0)
+```
+
+Now calculate the model accuracy:
+```{r}
+mean(seismicDataPredictions$pred == seismicDataPredictions$class)
+```
+
+This shows that the logistic regression model with all the factor variables made a correct prediction 44% of the time. 
+
+What would be the accuracy of the model if a model had simply predicted class 0 for each observation ?
+
+```{r}
+seismicDataPredictions$predNull <- 0
+mean(seismicDataPredictions$predNull == seismicDataPredictions$class)
+```
+
+With an accuracy of 44% the model is actually performing worse than if it were to predict class 0 for every record.
+
+This illustrates that "rare events" create challenges for classification models. When 1 outcome is very rare predicting the opposite can result in very high accuracy. 
+
+Calculate ROC Curves and AUC:
+The previous exercises have demonstrated that accuracy is a very misleading measure of model performance on imbalanced datasets. Graphing the model's performance better illustrates the tradeoff between a model that is overly agressive and one that is overly passive. Here we will create a ROC curve and compute the area under the curve (AUC) to evaluate the logistic regression model that we created above.
+
+```{r}
+#ROC <- roc(seismicDataPredictions$class, seismicDataPredictions$prob)
+#plot(ROC, col = "blue")
+#text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
+```
+
+
+
+
+## References
+
+  * [Application of rule induction algorithms for analysis of data collected by seismic  hazard monitoring systems in coal mines.](https://actamont.tuke.sk/pdf/2013/n4/7sikora.pdf)
+  * [A Study of Rockburst Hazard Evaluation Method in Coal Mine](https://www.hindawi.com/journals/sv/2016/8740868/#B13)
+  * [Classification: Basic concepts, decision trees and model evaluation](https://www-users.cs.umn.edu/~kumar001/dmbook/ch4.pdf)
+  * [Stackoverflow: Using glmnet with categorical predictors](https://stats.stackexchange.com/questions/69804/group-categorical-variables-in-glmnet)
+
+
+
+

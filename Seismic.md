@@ -10,10 +10,9 @@ Shravan Kuchkula, Dave Dyer, Tommy Pompo
 -   [Exploratory Data Analysis](#exploratory-data-analysis)
     -   [How are nbumps distributed ?](#how-are-nbumps-distributed)
     -   [Logistic Regression Assumptions](#logistic-regression-assumptions)
+-   [Problem with unbalanced class variable](#problem-with-unbalanced-class-variable)
 -   [Logistic Regression using cv.glmnet with balanced dataset with train/test split](#logistic-regression-using-cv.glmnet-with-balanced-dataset-with-traintest-split)
--   [Cross Validation](#cross-validation)
--   [Logistic Regression Model first take](#logistic-regression-model-first-take)
--   [Evaluating the model performance.](#evaluating-the-model-performance.)
+-   [Evaluating model performance using Cross Validation](#evaluating-model-performance-using-cross-validation)
 -   [Comparing the performance of classification techniques.](#comparing-the-performance-of-classification-techniques.)
 -   [References](#references)
 
@@ -158,6 +157,11 @@ corrplot(M, method="pie", type = "lower")
 
 ![](Seismic_files/figure-markdown_github/unnamed-chunk-9-1.png)
 
+Problem with unbalanced class variable
+--------------------------------------
+
+<Explain the problem we faced while using the dataset as is>
+
 Logistic Regression using cv.glmnet with balanced dataset with train/test split
 -------------------------------------------------------------------------------
 
@@ -231,21 +235,21 @@ coef(cvfit, s = "lambda.min")
 
     ## 22 x 1 sparse Matrix of class "dgCMatrix"
     ##                             1
-    ## (Intercept)     -1.5245096810
+    ## (Intercept)     -0.6877404393
     ## (Intercept)      .           
-    ## seismicb         0.3035483069
+    ## seismicb         0.0412656255
     ## seismoacousticb  .           
     ## seismoacousticc  .           
-    ## shiftW           0.5304594126
+    ## shiftW           0.0011580912
     ## genergy          .           
-    ## gpuls            0.0006050523
+    ## gpuls            0.0003433553
     ## gdenergy         .           
     ## gdpuls           .           
     ## ghazardb         .           
     ## ghazardc         .           
-    ## nbumps           0.2203920844
+    ## nbumps           0.2048022200
     ## nbumps2          .           
-    ## nbumps3          0.1606958127
+    ## nbumps3          .           
     ## nbumps4          .           
     ## nbumps5          .           
     ## nbumps6          .           
@@ -296,10 +300,10 @@ Note: The effect of balancing the class variable can be observed in the below ta
 
 This shows that logistic regression model's performance is largely dependent on having a balanced class variable.
 
-Cross Validation
-----------------
+Evaluating model performance using Cross Validation
+---------------------------------------------------
 
-Work in progress....
+Using cross validation we can assess how well our model building process works. The idea is that we can know how well our model will perform on new data not yet collected. We will use AUC as the performance metric.
 
 ``` r
 # Reimport the dataset and start fresh
@@ -309,115 +313,92 @@ sb <- import("seismic-bumps.arff")
 nonh <- sb %>%
   filter(class == 0)
 
+# Randomly choose 200 observations
+nonh <- nonh[sample(1:nrow(nonh), 200), ]
 
+# Extract hazardous observations
+h <- sb %>%
+  filter(class == 1)
 
+# Combine the nonh and h dataframes
+balancedSB <- rbind(nonh, h)
 
-# Number of Cross validation loops
+# Shuffle the dataframe
+balancedSB <- balancedSB[sample(1:nrow(balancedSB)),]
+
+# Extract the class variable into a vector call it "dat.train.y"
+dat.train.y <- balancedSB$class
+
+# Create a model matrix using the entire balancedSB. 
+# Earlier we split this into training/test data. 
+# Now we are going do that within the loop. 
+
+dat.train.x <- model.matrix(as.formula("class ~ ."), data = balancedSB)
+```
+
+Now we are ready for the cross-validation loop
+
+``` r
+# Define the number of cross-validation loops
 nloops <- 50
 
-# Number of samples in training data set
+# Number of observations in the training (i.e full) dataset
+ntrains <- nrow(dat.train.x)
+
+# Create an empty vector to hold all the AUC result.
+# Later we will display each run's AUC in a histogram
+cv.aucs <- c()
 ```
 
-Logistic Regression Model first take
-------------------------------------
-
-Fit a logistic regression model with what you think could be contributing to the seismic hazard.
+Run the cross validation
 
 ``` r
-seismic_model <- glm(class ~ seismic + seismoacoustic + shift + ghazard,
-                     data = seismicData, family = "binomial")
+for (i in 1:nloops){
+  
+ # Get the indexes using sample
+ index<-sample(1:ntrains,60)
+ 
+ # randomly draw 60 observations from front and call it training set
+ cvtrain.x<-as.matrix(dat.train.x[index,])
+ 
+ # randomly draw 60 observations from back and call it test set
+ cvtest.x<-as.matrix(dat.train.x[-index,])
+ 
+ # Get the corresponding class variable
+ cvtrain.y<-dat.train.y[index]
+ cvtest.y<-dat.train.y[-index]
+ 
+ ## Model fitting:
+ # Call cv.glmnet to fit the model using training set
+ cvfit <- cv.glmnet(cvtrain.x, cvtrain.y, family = "binomial", type.measure = "class")
+ 
+ ## Prediction:
+ # Predict using test set using the above model. Use type = "response" to get prediction probabilities.
+ fit.pred <- predict(cvfit, newx = cvtest.x, type = "response")
+ # Prediction function takes prediction probabilities as first arg and class to compare as its second arg
+ pred <- prediction(fit.pred[,1], cvtest.y)
+ 
+ ## Prediction Performance:
+ # Check prediction performance
+ roc.perf = performance(pred, measure = "tpr", x.measure = "fpr")
+ auc.train <- performance(pred, measure = "auc")
+ auc.train <- auc.train@y.values
+ 
+ # Store the auc value for this run into the vector
+ cv.aucs[i]<-auc.train[[1]]
 
-summary(seismic_model)
+}
 ```
 
-    ## 
-    ## Call:
-    ## glm(formula = class ~ seismic + seismoacoustic + shift + ghazard, 
-    ##     family = "binomial", data = seismicData)
-    ## 
-    ## Deviance Residuals: 
-    ##     Min       1Q   Median       3Q      Max  
-    ## -0.6757  -0.4321  -0.3998  -0.1856   2.9426  
-    ## 
-    ## Coefficients:
-    ##                  Estimate Std. Error z value Pr(>|z|)    
-    ## (Intercept)      -4.05310    0.25427 -15.940  < 2e-16 ***
-    ## seismicb          0.42551    0.16421   2.591  0.00956 ** 
-    ## seismoacousticb   0.05025    0.17474   0.288  0.77369    
-    ## seismoacousticc   0.70002    0.67220   1.041  0.29770    
-    ## shiftW            1.56663    0.26392   5.936 2.92e-09 ***
-    ## ghazardb         -0.31343    0.32304  -0.970  0.33192    
-    ## ghazardc        -14.38103  424.95947  -0.034  0.97300    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## (Dispersion parameter for binomial family taken to be 1)
-    ## 
-    ##     Null deviance: 1253.8  on 2583  degrees of freedom
-    ## Residual deviance: 1178.9  on 2577  degrees of freedom
-    ## AIC: 1192.9
-    ## 
-    ## Number of Fisher Scoring iterations: 15
-
-Making a binary prediction: We used the glm() function to build a logistic regression model of the `class` variable. As with many of R's machine learning methods, you can apply the `predict()` function to the model object to forecast future behavior. By default, predict() outputs predictions in terms of log odds unless `type = "response"` is specified. This converts the log odds to probabilities.
-
-Because a logistic regression model estimates the probability of the outcome, it is up to you to determine the threshold at which the probability implies action. One must balance the extremes of being too cautious versus being too aggressive. For example, if we classify an observation which has a probability of being in class 1 as 99% or greater, then we may miss out on some observations that may indeed be class 1 but were classified as class 0. This balance is particularly important to consider for severely imbalanced outcomes, such as in this dataset where class 1 are relatively rare.
+Draw a historgram of cv.aucs
 
 ``` r
-# make a copy
-seismicDataPredictions <- seismicData
-
-# Estimate the probability of class 1
-seismicDataPredictions$prob <- predict(seismic_model, type = "response")
+hist(cv.aucs)
 ```
 
-Find the actual probability of an observation to be in class 1.
+![](Seismic_files/figure-markdown_github/unnamed-chunk-19-1.png)
 
-``` r
-mean(as.numeric(as.character(seismicData$class)))
-```
-
-    ## [1] 0.06578947
-
-We will use this as our cut-off threshold.
-
-``` r
-seismicDataPredictions$pred <- ifelse(seismicDataPredictions$prob > 0.0657, 1, 0)
-```
-
-Now calculate the model accuracy:
-
-``` r
-mean(seismicDataPredictions$pred == seismicDataPredictions$class)
-```
-
-    ## [1] 0.4384675
-
-This shows that the logistic regression model with all the factor variables made a correct prediction 44% of the time.
-
-What would be the accuracy of the model if a model had simply predicted class 0 for each observation ?
-
-``` r
-seismicDataPredictions$predNull <- 0
-mean(seismicDataPredictions$predNull == seismicDataPredictions$class)
-```
-
-    ## [1] 0.9342105
-
-With an accuracy of 44% the model is actually performing worse than if it were to predict class 0 for every record.
-
-This illustrates that "rare events" create challenges for classification models. When 1 outcome is very rare predicting the opposite can result in very high accuracy.
-
-Calculate ROC Curves and AUC: The previous exercises have demonstrated that accuracy is a very misleading measure of model performance on imbalanced datasets. Graphing the model's performance better illustrates the tradeoff between a model that is overly agressive and one that is overly passive. Here we will create a ROC curve and compute the area under the curve (AUC) to evaluate the logistic regression model that we created above.
-
-``` r
-#ROC <- roc(seismicDataPredictions$class, seismicDataPredictions$prob)
-#plot(ROC, col = "blue")
-#text(x = .42, y = .6,paste("AUC = ", round(auc(ROC), 2), sep = ""))
-```
-
-Evaluating the model performance.
----------------------------------
+This indicates that a majority of time our model prediction performance lies between 70 to 75%
 
 Comparing the performance of classification techniques.
 -------------------------------------------------------
