@@ -11,7 +11,9 @@ Shravan Kuchkula, Dave Dyer, Tommy Pompo
     -   [How are nbumps distributed ?](#how-are-nbumps-distributed)
     -   [Logistic Regression Assumptions](#logistic-regression-assumptions)
 -   [Problem with unbalanced class variable](#problem-with-unbalanced-class-variable)
--   [Logistic Regression using cv.glmnet with full model (unbalanced)](#logistic-regression-using-cv.glmnet-with-full-model-unbalanced)
+    -   [Full Model](#full-model)
+    -   [Null Model](#null-model)
+-   [Balancing the class variable](#balancing-the-class-variable)
 -   [Logistic Regression using with balanced dataset with train/test split](#logistic-regression-using-with-balanced-dataset-with-traintest-split)
 -   [Evaluating model performance using Cross Validation](#evaluating-model-performance-using-cross-validation)
 -   [Comparing the performance of classification techniques.](#comparing-the-performance-of-classification-techniques.)
@@ -161,6 +163,12 @@ corrplot(M, method="pie", type = "lower")
 Problem with unbalanced class variable
 --------------------------------------
 
+To illustrate the problem with having an unbalanced class variable we compare accuracy of the logistic regression full model with the null model.
+
+### Full Model
+
+We first built a logistic regression model taking all the observations and variables into account. The summary of this full model is shown in the figure.
+
 ``` r
 # Reimport the dataset and start fresh
 sb <- import("seismic-bumps.arff")
@@ -214,6 +222,8 @@ summary(fullModel)
     ## 
     ## Number of Fisher Scoring iterations: 15
 
+Next we predict using this full model and calculate the probability of getting a hazardous bump. To convert these probabilities to classes, we define a threshold. A good value for threshold is the mean of the original response variable. Probabilities greater than this threshold are categorized into hazardous bump class and probabilities lesser than the threshold are categorized into non-hazardous bump class. Model accuracy is then calculated by comparing with the actual class variable.
+
 ``` r
 sb$prob <- predict(fullModel, type = "response")
 
@@ -232,9 +242,11 @@ fullModelAccuracy
 
     ## [1] 0.7352941
 
-This shows that the logistic regression model with all the factor variables made a correct prediction 0.74% of the time.
+Our calculation show that the logistic regression model with all the observations and variables made a correct prediction 0.74% of the time.
 
-What if our model always predicted class == 1, then what is the accuracy ?
+### Null Model
+
+What if our model always predicted class == 0, then what is the accuracy ?
 
 ``` r
 sb$predNull <- 0
@@ -246,126 +258,14 @@ nullModelAccuracy
 
     ## [1] 0.9342105
 
-With our fullModel accuracy of 0.74% the model is actually performing worse than if it were to predict class 0 for every record.
+The null model accuracy is 93.42%. With our fullModel accuracy of 0.74% the model is actually performing worse than if it were to predict class 0 for every record.
 
-This illustrates that "rare events" create challenges for classification models. When 1 outcome is very rare predicting the opposite can result in very high accuracy. We have demonstrated that accuracy is a very misleading measure of model performance on imbalanced datasets. Graphing the model's performance better illustrates the tradeoff between a model that is overly agressive and one that is overly passive. Here we will create a ROC curve and compute the area under the curve (AUC) to evaluate the logistic regression model that we created above.
+This illustrates that "rare events" create challenges for classification models. When one outcome is very rare predicting the opposite can result in very high accuracy. We have demonstrated that accuracy is a very misleading measure of model performance on imbalanced datasets. Graphing the model's performance better illustrates the tradeoff between a model that is overly agressive and one that is overly passive. In the next section we will create a ROC curve and compute the area under the curve (AUC) to evaluate the logistic regression model.
 
-``` r
-predObj <- prediction(sb$prob, sb$class)
+Balancing the class variable
+----------------------------
 
-myroc.perf <- performance(predObj, measure = "tpr", x.measure = "fpr")
-plot(myroc.perf)
-
-# Measure the performance using AUC
-auc.test <- performance(predObj, measure = "auc")
-
-# Get the AUC value to display on the ROC plot
-auc.value <- auc.test@y.values
-
-# Plot the ROC with AUC value
-plot(myroc.perf)
-abline(a=0, b= 1) #Ref line indicating poor performance
-text(x = .40, y = .6,paste("AUC = ", round(auc.value[[1]],3), sep = ""))
-```
-
-![](Seismic_files/figure-markdown_github/unnamed-chunk-13-1.png)
-
-What happens when we balance the dataset ?
-
-``` r
-# Reimport the dataset and start fresh
-sb <- import("seismic-bumps.arff")
-
-# Extract non-hazardous observations
-nonh <- sb %>%
-  filter(class == 0)
-
-# Randomly choose 200 observations
-nonh <- nonh[sample(1:nrow(nonh), 200), ]
-
-# Extract hazardous observations
-h <- sb %>%
-  filter(class == 1)
-
-# Combine the nonh and h dataframes
-balancedSB <- rbind(nonh, h)
-
-# Shuffle the dataframe
-balancedSB <- balancedSB[sample(1:nrow(balancedSB)),]
-
-# Build a full model
-fullBalancedModel <- glm(class ~ . , data = balancedSB, family = "binomial")
-
-# Summary full model
-summary(fullBalancedModel)
-```
-
-    ## 
-    ## Call:
-    ## glm(formula = class ~ ., family = "binomial", data = balancedSB)
-    ## 
-    ## Deviance Residuals: 
-    ##     Min       1Q   Median       3Q      Max  
-    ## -2.5447  -0.9239  -0.5328   0.9729   1.9841  
-    ## 
-    ## Coefficients: (3 not defined because of singularities)
-    ##                   Estimate Std. Error z value Pr(>|z|)    
-    ## (Intercept)     -1.866e+00  3.082e-01  -6.055 1.41e-09 ***
-    ## seismicb         1.588e-01  2.697e-01   0.589   0.5561    
-    ## seismoacousticb  1.342e-01  2.667e-01   0.503   0.6148    
-    ## seismoacousticc  2.000e-01  1.036e+00   0.193   0.8469    
-    ## shiftW           7.752e-01  3.608e-01   2.148   0.0317 *  
-    ## genergy         -6.879e-07  7.436e-07  -0.925   0.3549    
-    ## gpuls            8.585e-04  3.536e-04   2.428   0.0152 *  
-    ## gdenergy        -1.539e-03  2.912e-03  -0.529   0.5971    
-    ## gdpuls           1.785e-03  3.742e-03   0.477   0.6333    
-    ## ghazardb        -2.876e-01  5.144e-01  -0.559   0.5761    
-    ## ghazardc        -1.503e+01  8.204e+02  -0.018   0.9854    
-    ## nbumps           1.735e+01  1.455e+03   0.012   0.9905    
-    ## nbumps2         -1.700e+01  1.455e+03  -0.012   0.9907    
-    ## nbumps3         -1.703e+01  1.455e+03  -0.012   0.9907    
-    ## nbumps4         -1.729e+01  1.455e+03  -0.012   0.9905    
-    ## nbumps5         -3.221e+00  2.058e+03  -0.002   0.9988    
-    ## nbumps6                 NA         NA      NA       NA    
-    ## nbumps7                 NA         NA      NA       NA    
-    ## nbumps89                NA         NA      NA       NA    
-    ## energy          -1.336e-05  6.189e-05  -0.216   0.8291    
-    ## maxenergy        2.793e-05  6.325e-05   0.442   0.6588    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## (Dispersion parameter for binomial family taken to be 1)
-    ## 
-    ##     Null deviance: 510.49  on 369  degrees of freedom
-    ## Residual deviance: 419.86  on 352  degrees of freedom
-    ## AIC: 455.86
-    ## 
-    ## Number of Fisher Scoring iterations: 14
-
-``` r
-balancedSB$prob <- predict(fullBalancedModel, type = "response")
-
-predObj <- prediction(balancedSB$prob, balancedSB$class)
-
-myroc.perf <- performance(predObj, measure = "tpr", x.measure = "fpr")
-plot(myroc.perf)
-
-# Measure the performance using AUC
-auc.test <- performance(predObj, measure = "auc")
-
-# Get the AUC value to display on the ROC plot
-auc.value <- auc.test@y.values
-
-# Plot the ROC with AUC value
-plot(myroc.perf)
-abline(a=0, b= 1) #Ref line indicating poor performance
-text(x = .40, y = .6,paste("AUC = ", round(auc.value[[1]],3), sep = ""))
-```
-
-![](Seismic_files/figure-markdown_github/unnamed-chunk-15-1.png)
-
-Logistic Regression using cv.glmnet with full model (unbalanced)
-----------------------------------------------------------------
+When balancing the class variable, a key question to ask ourselves is by how much should we shrink the number of observations for the class with most values. To aid in answering this question, we can use cross validation to figure out the optimal value to choose. We developed a function in R called `cVLogisticRegression(n, k, size)`- where `n` is the number of observations of the majority class, `k` is the number of folds and `size` is the number of observations per fold to include in test and train data. The function returns a vector of “Area Under the Curve” AUC values. A histogram of these AUC values for n = 170, n = 500, n = 1000 is shown in the figure.
 
 ``` r
 cVLogisticRegression <- function(n, k, size){
@@ -412,12 +312,12 @@ cVLogisticRegression <- function(n, k, size){
   for (i in 1:nloops){
   
    # Get the indexes using sample
-   index<-sample(1:ntrains,60)
+   index<-sample(1:ntrains,size)
  
-   # randomly draw 60 observations from front and call it training set
+   # randomly draw observations from front and call it training set
    cvtrain.x<-as.matrix(dat.train.x[index,])
  
-   # randomly draw 60 observations from back and call it test set
+   # randomly draw observations from back and call it test set
    cvtest.x<-as.matrix(dat.train.x[-index,])
  
    # Get the corresponding class variable
@@ -449,27 +349,54 @@ cVLogisticRegression <- function(n, k, size){
   return(cv.aucs)
 
 }
+```
 
+For n = 170
+
+``` r
+# n - number of class 0 obs
+# k - number of folds to use in cv 
+# size - size of each fold
+aucVector <- cVLogisticRegression(170, 50, 60)
+hist(aucVector, main = paste("Histogram of AUC for n = ", 170))
+text(x = 0.75, y = 25, paste("Mean AUC = ", round(mean(aucVector), 2)), col = "blue")
+```
+
+![](Seismic_files/figure-markdown_github/unnamed-chunk-14-1.png)
+
+For n = 500
+
+``` r
 # n - number of class 0 obs
 # k - number of folds to use in cv 
 # size - size of each fold
 aucVector <- cVLogisticRegression(500, 50, 60)
-hist(aucVector)
+hist(aucVector, main = paste("Histogram of AUC for n = ", 500))
 text(x = 0.75, y = 25, paste("Mean AUC = ", round(mean(aucVector), 2)), col = "blue")
 ```
 
-![](Seismic_files/figure-markdown_github/unnamed-chunk-16-1.png)
+![](Seismic_files/figure-markdown_github/unnamed-chunk-15-1.png)
+
+For n = 1000
 
 ``` r
 # n - number of class 0 obs
 # k - number of folds to use in cv 
 # size - size of each fold
 aucVector <- cVLogisticRegression(1000, 50, 60)
-hist(aucVector)
+hist(aucVector, main = paste("Histogram of AUC for n = ", 1000))
 text(x = 0.65, y = 22, paste("Mean AUC = ", round(mean(aucVector), 2)), col = "blue")
 ```
 
-![](Seismic_files/figure-markdown_github/unnamed-chunk-17-1.png)
+![](Seismic_files/figure-markdown_github/unnamed-chunk-16-1.png)
+
+As we can see, as the n value increases (i.e imbalance increases) our model performance is decreasing. This suggests that we should carefully choose the n value while building our model.
+
+The effect of balancing the class variable can be observed in the below table:
+
+200 -&gt; AUC was close to 80% 500 -&gt; AUC was close to 75% 1000 -&gt; AUC was close to 50%
+
+This shows that logistic regression model's performance is largely dependent on having a balanced class variable.
 
 Logistic Regression using with balanced dataset with train/test split
 ---------------------------------------------------------------------
@@ -534,7 +461,7 @@ cvfit <- cv.glmnet(balancedSBmatrix, train_class, family = "binomial", type.meas
 plot(cvfit)
 ```
 
-![](Seismic_files/figure-markdown_github/unnamed-chunk-20-1.png)
+![](Seismic_files/figure-markdown_github/unnamed-chunk-19-1.png)
 
 We are essentially looking for the lamba value which yeilds the lowest miss-classification error. That lamba value will be the number of coefficients that are contributing the most.
 
@@ -546,28 +473,28 @@ coef(cvfit, s = "lambda.min")
 
     ## 22 x 1 sparse Matrix of class "dgCMatrix"
     ##                             1
-    ## (Intercept)     -1.576129e+00
+    ## (Intercept)     -1.752074e+00
     ## (Intercept)      .           
-    ## seismicb         .           
+    ## seismicb         1.428659e-01
     ## seismoacousticb  .           
-    ## seismoacousticc  1.786343e-01
-    ## shiftW           7.610690e-01
-    ## genergy          6.864944e-07
-    ## gpuls            5.140968e-04
-    ## gdenergy         .           
+    ## seismoacousticc  .           
+    ## shiftW           5.635677e-01
+    ## genergy          .           
+    ## gpuls            7.108425e-04
+    ## gdenergy        -1.933688e-03
     ## gdpuls           .           
-    ## ghazardb         .           
-    ## ghazardc        -1.207230e+00
-    ## nbumps           1.634370e-01
+    ## ghazardb         2.289537e-02
+    ## ghazardc        -2.262767e+00
+    ## nbumps           4.597309e-01
     ## nbumps2          .           
-    ## nbumps3          2.608705e-01
-    ## nbumps4          2.498073e-01
-    ## nbumps5          .           
+    ## nbumps3          1.648312e-01
+    ## nbumps4          .           
+    ## nbumps5          1.519284e-01
     ## nbumps6          .           
     ## nbumps7          .           
     ## nbumps89         .           
-    ## energy           .           
-    ## maxenergy       -2.272926e-06
+    ## energy          -5.253076e-06
+    ## maxenergy        .
 
 **Prediction**:
 
@@ -603,13 +530,7 @@ abline(a=0, b= 1) #Ref line indicating poor performance
 text(x = .40, y = .6,paste("AUC = ", round(auc.value[[1]],3), sep = ""))
 ```
 
-![](Seismic_files/figure-markdown_github/unnamed-chunk-23-1.png)
-
-Note: The effect of balancing the class variable can be observed in the below table:
-
-200 -&gt; AUC was close to 80% 500 -&gt; AUC was close to 75% 1000 -&gt; AUC was close to 50%
-
-This shows that logistic regression model's performance is largely dependent on having a balanced class variable.
+![](Seismic_files/figure-markdown_github/unnamed-chunk-22-1.png)
 
 Evaluating model performance using Cross Validation
 ---------------------------------------------------
@@ -708,7 +629,7 @@ hist(cv.aucs)
 text(x = 0.75, y = 22, paste("Mean AUC = ", round(mean(cv.aucs), 2)), col = "blue")
 ```
 
-![](Seismic_files/figure-markdown_github/unnamed-chunk-27-1.png)
+![](Seismic_files/figure-markdown_github/unnamed-chunk-26-1.png)
 
 This indicates that a majority of time our model prediction performance lies between 70 to 75%
 

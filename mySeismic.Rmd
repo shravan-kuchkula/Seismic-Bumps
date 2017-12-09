@@ -411,6 +411,84 @@ The previous exercises have demonstrated that accuracy is a very misleading meas
 
 
 
+```{r}
+
+predObj <- prediction(sb$prob, sb$class)
+
+myroc.perf <- performance(predObj, measure = "tpr", x.measure = "fpr")
+plot(myroc.perf)
+
+# Measure the performance using AUC
+auc.test <- performance(predObj, measure = "auc")
+
+# Get the AUC value to display on the ROC plot
+auc.value <- auc.test@y.values
+
+# Plot the ROC with AUC value
+plot(myroc.perf)
+abline(a=0, b= 1) #Ref line indicating poor performance
+text(x = .40, y = .6,paste("AUC = ", round(auc.value[[1]],3), sep = ""))
+
+
+```
+
+
+What happens when we balance the dataset ?
+
+```{r}
+# Reimport the dataset and start fresh
+sb <- import("seismic-bumps.arff")
+
+# Extract non-hazardous observations
+nonh <- sb %>%
+  filter(class == 0)
+
+# Randomly choose 200 observations
+nonh <- nonh[sample(1:nrow(nonh), 200), ]
+
+# Extract hazardous observations
+h <- sb %>%
+  filter(class == 1)
+
+# Combine the nonh and h dataframes
+balancedSB <- rbind(nonh, h)
+
+# Shuffle the dataframe
+balancedSB <- balancedSB[sample(1:nrow(balancedSB)),]
+
+# Build a full model
+fullBalancedModel <- glm(class ~ . , data = balancedSB, family = "binomial")
+
+# Summary full model
+summary(fullBalancedModel)
+
+
+```
+
+
+```{r}
+balancedSB$prob <- predict(fullBalancedModel, type = "response")
+
+predObj <- prediction(balancedSB$prob, balancedSB$class)
+
+myroc.perf <- performance(predObj, measure = "tpr", x.measure = "fpr")
+plot(myroc.perf)
+
+# Measure the performance using AUC
+auc.test <- performance(predObj, measure = "auc")
+
+# Get the AUC value to display on the ROC plot
+auc.value <- auc.test@y.values
+
+# Plot the ROC with AUC value
+plot(myroc.perf)
+abline(a=0, b= 1) #Ref line indicating poor performance
+text(x = .40, y = .6,paste("AUC = ", round(auc.value[[1]],3), sep = ""))
+
+```
+
+
+
 
 ## References
 
