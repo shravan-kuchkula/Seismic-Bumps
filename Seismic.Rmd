@@ -394,7 +394,7 @@ For n = 170
 # size - size of each fold
 aucVector <- cVLogisticRegression(170, 50, 60)
 hist(aucVector, main = paste("Histogram of AUC for n = ", 170))
-text(x = 0.75, y = 25, paste("Mean AUC = ", round(mean(aucVector), 2)), col = "blue")
+text(x = 0.75, y = 20, paste("Mean AUC = ", round(mean(aucVector), 2)), col = "blue")
 ```
 
 For n = 500
@@ -492,6 +492,20 @@ plot(cvfit)
 ```
 
 We are essentially looking for the lamba value which yeilds the lowest miss-classification error. That lamba value will be the number of coefficients that are contributing the most.
+
+```{r}
+ls(cvfit)
+```
+
+```{r}
+cvfit$lambda.min
+cvfit$lambda.1se
+```
+
+```{r}
+cvfit$lambda
+```
+
 
 Check the coefficients
 
@@ -635,9 +649,118 @@ text(x = 0.75, y = 22, paste("Mean AUC = ", round(mean(cv.aucs), 2)), col = "blu
 
 This indicates that a majority of time our model prediction performance lies between 70 to 75% 
 
+## Cross-Validation with random shuffle of response variable
 
+```{r warning = FALSE}
+
+cVLogisticRegressionRandomShuffle <- function(n, k, size){
+  
+  # Reimport the dataset and start fresh
+  sb <- import("seismic-bumps.arff")
+
+  # Extract non-hazardous observations
+  nonh <- sb %>%
+    filter(class == 0)
+
+  # Randomly choose n observations
+  nonh <- nonh[sample(1:nrow(nonh), n), ]
+
+  # Extract hazardous observations
+  h <- sb %>%
+    filter(class == 1)
+
+  # Combine the nonh and h dataframes
+  balancedSB <- rbind(nonh, h)
+
+  # Shuffle the dataframe
+  balancedSB <- balancedSB[sample(1:nrow(balancedSB)),]
+
+  # Extract the class variable into a vector call it "dat.train.y"
+  dat.train.y <- balancedSB$class
+
+  # Create a model matrix using the entire balancedSB. 
+  # Earlier we split this into training/test data. 
+  # Now we are going do that within the loop. 
+
+  dat.train.x <- model.matrix(as.formula("class ~ ."), data = balancedSB)
+
+  # Define the number of cross-validation loops
+  nloops <- k
+
+  # Number of observations in the training (i.e full) dataset
+  ntrains <- nrow(dat.train.x)
+
+  # Create an empty vector to hold all the AUC result.
+  # Later we will display each run's AUC in a histogram
+  cv.aucs <- c()
+  
+  # Randomly shuffle the response variable
+  dat.train.yshuf <- dat.train.y[sample(1:length(dat.train.y))]
+
+  for (i in 1:nloops){
+  
+   # Get the indexes using sample
+   index<-sample(1:ntrains,size)
+ 
+   # randomly draw observations from front and call it training set
+   cvtrain.x<-as.matrix(dat.train.x[index,])
+ 
+   # randomly draw observations from back and call it test set
+   cvtest.x<-as.matrix(dat.train.x[-index,])
+ 
+   # Get the corresponding class variable
+   cvtrain.y<-dat.train.yshuf[index]
+   cvtest.y<-dat.train.yshuf[-index]
+ 
+   ## Model fitting:
+   # Call cv.glmnet to fit the model using training set
+   cvfit <- cv.glmnet(cvtrain.x, cvtrain.y, family = "binomial", type.measure = "class")
+ 
+   ## Prediction:
+   # Predict using test set using the above model. Use type = "response" to get prediction probabilities.
+   fit.pred <- predict(cvfit, newx = cvtest.x, type = "response")
+   
+   # Prediction function takes prediction probabilities as first arg and class to compare as its second arg
+   pred <- prediction(fit.pred[,1], cvtest.y)
+ 
+   ## Prediction Performance:
+   # Check prediction performance
+   roc.perf = performance(pred, measure = "tpr", x.measure = "fpr")
+   auc.train <- performance(pred, measure = "auc")
+   auc.train <- auc.train@y.values
+ 
+   # Store the auc value for this run into the vector
+   cv.aucs[i]<-auc.train[[1]]
+
+  }
+  
+  return(cv.aucs)
+
+}
+```
+
+For n = 200
+```{r warning=FALSE}
+# n - number of class 0 obs
+# k - number of folds to use in cv 
+# size - size of each fold
+aucVector <- cVLogisticRegressionRandomShuffle(200, 50, 60)
+hist(aucVector, main = paste("AUC for Random Shuffle of Y for n = ", 200))
+text(x = 0.75, y = 25, paste("Mean AUC = ", round(mean(aucVector), 2)), col = "blue")
+```
+
+For n = 500
+```{r warning=FALSE}
+# n - number of class 0 obs
+# k - number of folds to use in cv 
+# size - size of each fold
+aucVector <- cVLogisticRegressionRandomShuffle(500, 50, 60)
+hist(aucVector, main = paste("AUC for Random Shuffle of Y for n = ", 500))
+text(x = 0.75, y = 25, paste("Mean AUC = ", round(mean(aucVector), 2)), col = "blue")
+```
 
 ## Comparing the performance of classification techniques. 
+
 
 Within the ARFF file is a large table of various classification techniques and their results.  
 
