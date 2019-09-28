@@ -1,6 +1,6 @@
 seismic.Rmd
 ================
-Shravan Kuchkula, Dave Dyer, Tommy Pompo
+Shravan Kuchkula
 12/03/2017
 
 -   [Introduction](#introduction)
